@@ -68,7 +68,6 @@ def insert_vertices(endpoint, vertex_coll_name, vertices, username, password):
     :param password: the password
     :return: None
     '''
-    print(vertices)
     url = os.path.join(endpoint, "_api/document/", vertex_coll_name)
     response = requests.post(url, json=vertices, auth=(username, password))
     if response.status_code != 202:
@@ -86,27 +85,11 @@ def insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, shard_val
     :param password: the password
     :return: None
     '''
-    doc = dict()
-
-    q = f'''FOR p in @edges
-    LET _from = ( 
-        FOR vertex IN @@vertex_coll
-        FILTER vertex.{shard_value} == p._from
-        RETURN vertex._id
-    )[0]
-    LET _to = ( 
-        FOR vertex IN @@vertex_coll
-        FILTER vertex.{shard_value} == p._to
-        RETURN vertex._id
-    )[0]
-    INSERT {{_from, _to, weight: p.weight}} INTO @@edge_coll'''
-    doc['query'] = q
-    doc['bindVars'] = {'edges': edges, '@vertex_coll': vertices_coll_name, '@edge_coll': edges_coll_name}
-    url = os.path.join(endpoint, f"_api/cursor/")
-    response = requests.post(url, json=doc, auth=(username, password))
-    if response.status_code != 201:
-        raise RuntimeError(f"Invalid response from insert_edges{response.text}")
-
+    url = os.path.join(endpoint, "_api/document/", edges_coll_name)
+    response = requests.post(url, json=edges, auth=(username, password))
+    if response.status_code != 202:
+        raise RuntimeError(f"Invalid response from bulk insert{response.text}")
+    
 
 def file_reader(filename, bulk_size):
     '''
@@ -165,7 +148,7 @@ def read_and_create_vertices(filename, endpoint, bulk_size, vertices_coll_name, 
     :return: None
     '''
     for vids in file_reader(filename, bulk_size):
-        vertices = [{f'{shard_value}': vid} for vid in vids]
+        vertices = [{f'{shard_value}': str(vid), '_key': str(vid) + ':'+ str(vid)} for vid in vids]
         insert_vertices(endpoint, vertices_coll_name, vertices, username, password)
 
 
@@ -199,21 +182,21 @@ def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, e
                 e = i.split(' ', 2)
                 if len(e) == 2: # no weight given
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"}) # Null will be inserted
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"}) # Null will be inserted
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
         else:
             for i in eids:
                 e = i.split(' ', 2)
                 if len(e) == 2:
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"}) # Null will be inserted
-                    edges.append({"_from": f"{t}", "_to": f"{f}"}) # Null will be inserted
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"}) # Null will be inserted
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}"}) # Null will be inserted
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
-                    edges.append({"_from": f"{t}", "_to": f"{f}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}", "weight": f'{w}'})
         insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, shard_value, username, password)
 
 
