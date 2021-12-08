@@ -43,7 +43,7 @@ def read_and_create_vertices(filename, endpoint, bulk_size, vertices_coll_name, 
     :return: None
     '''
     for vids in file_reader(filename, bulk_size):
-        vertices = [{f'{smart_attribute}': vid} for vid in vids]
+        vertices = [{f'{smart_attribute}': str(vid), '_key': str(vid) + ':'+ str(vid)} for vid in vids]
         insert_vertices(endpoint, vertices_coll_name, vertices, username, password)
 
 
@@ -77,21 +77,21 @@ def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, e
                 e = i.split(' ', 2)
                 if len(e) == 2:  # no weight given
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"})  # Null will be inserted
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
         else:
             for i in eids:
                 e = i.split(' ', 2)
                 if len(e) == 2:
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"})  # Null will be inserted for weight
-                    edges.append({"_from": f"{t}", "_to": f"{f}"})  # Null will be inserted for weight
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted for weight
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}"})  # Null will be inserted for weight
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
-                    edges.append({"_from": f"{t}", "_to": f"{f}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}", "weight": f'{w}'})
         insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, smart_attribute, username, password)
 
 

@@ -103,27 +103,10 @@ def insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, smart_att
     :param password: the password
     :return: None
     '''
-    doc = dict()
-
-    q = f'''FOR p in @edges
-    LET _from = ( 
-        FOR vertex IN @@vertex_coll
-        FILTER vertex.{smart_attribute} == p._from
-        RETURN vertex._id
-    )[0]
-    LET _to = ( 
-        FOR vertex IN @@vertex_coll
-        FILTER vertex.{smart_attribute} == p._to
-        RETURN vertex._id
-    )[0]
-    INSERT {{_from, _to, weight: p.weight}} INTO @@edge_coll'''
-    doc['query'] = q
-    doc['bindVars'] = {'edges': edges, '@vertex_coll': vertices_coll_name, '@edge_coll': edges_coll_name}
-    url = os.path.join(endpoint, f"_api/cursor/")
-    response = requests.post(url, json=doc, auth=(username, password))
-    if response.status_code != 201:
-        raise RuntimeError(f"Invalid response from server during insert_edges: {response.text}")
-
+    url = os.path.join(endpoint, "_api/document/", edges_coll_name)
+    response = requests.post(url, json=edges, auth=(username, password))
+    if response.status_code != 202:
+        raise RuntimeError(f"Invalid response from bulk insert{response.text}")
 
 def file_reader(filename, bulk_size):
     '''
