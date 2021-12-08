@@ -1,7 +1,7 @@
 import os
 from pathlib import PurePath
 
-from general import file_reader, insert_vertices, insert_edges, create_graph
+from general import file_reader, insert_documents, create_graph
 
 
 def import_graphalytics_get_files(directory: str):
@@ -44,7 +44,7 @@ def read_and_create_vertices(filename, endpoint, bulk_size, vertices_coll_name, 
     '''
     for vids in file_reader(filename, bulk_size):
         vertices = [{f'{smart_attribute}': str(vid), '_key': str(vid) + ':'+ str(vid)} for vid in vids]
-        insert_vertices(endpoint, vertices_coll_name, vertices, username, password)
+        insert_documents(endpoint, vertices_coll_name, vertices, username, password)
 
 
 def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, endpoint, bulk_size, isDirected,
@@ -92,7 +92,7 @@ def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, e
                     f, t, w = e
                     edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
                     edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}", "weight": f'{w}'})
-        insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, smart_attribute, username, password)
+        insert_documents(endpoint, edges_coll_name, edges, username, password)
 
 
 def import_graphalytics(endpoint, vertices_filename, edges_filename, properties_filename, bulk_size,

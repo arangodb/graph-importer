@@ -75,36 +75,18 @@ def insert_vertices_unique(endpoint, vertices_coll_name, vertices, smart_attribu
     if response.status_code != 201:
         raise RuntimeError(f'Invalid response from server during insert_vertices_unique: {response.text}')
 
-
-def insert_vertices(endpoint, vertex_coll_name, vertices, username, password):
-    '''
-    Insert a vertex or a list of vertices into the vertex collection.
-    :param endpoint: the server address
-    :param vertex_coll_name: the vertex collection name
-    :param vertices: the vertex or (typically) the list of vertices
-    :param username: the username
-    :param password: the password
-    :return: None
-    '''
-    url = os.path.join(endpoint, "_api/document/", vertex_coll_name)
-    response = requests.post(url, json=vertices, auth=(username, password))
-    if response.status_code != 202:
-        raise RuntimeError(f"Invalid response from server during insert_vertices: {response.text}")
-
-
-def insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, smart_attribute, username, password):
+def insert_documents(endpoint, coll_name, documents, username, password):
     '''
     Insert an edge or (typically) a list of edges into the edge collection.
-    :param endpoint: the srever address
-    :param edges_coll_name: the name of the edge collection
-    :param vertices_coll_name: the name of the vertex collection
-    :param edges: the edge or (typically) the list of edges to insert
+    :param endpoint: the server address
+    :param coll_name: the name of the edge collection
+    :param documents: the document or (typically) the list of documents to insert
     :param username: the username
     :param password: the password
     :return: None
     '''
-    url = os.path.join(endpoint, "_api/document/", edges_coll_name)
-    response = requests.post(url, json=edges, auth=(username, password))
+    url = os.path.join(endpoint, "_api/document/", coll_name)
+    response = requests.post(url, json=documents, auth=(username, password))
     if response.status_code != 202:
         raise RuntimeError(f"Invalid response from bulk insert{response.text}")
 

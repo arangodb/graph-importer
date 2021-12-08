@@ -1,4 +1,4 @@
-from general import file_reader, insert_edges, create_graph, insert_vertices_unique
+from general import file_reader, insert_documents, create_graph, insert_vertices_unique
 
 
 def read_and_create_vertices_and_edges(edges_filename, edges_coll_name, vertices_coll_name, endpoint, bulk_size,
@@ -34,10 +34,10 @@ def read_and_create_vertices_and_edges(edges_filename, edges_coll_name, vertices
                 e = i.split(' ', 2)
                 if len(e) == 2:  # no weight given
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"})  # Null will be inserted
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted
                 else:  # len == 3
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
                 # add vertices
                 # this tests existence just in this bulk, globally checked in insert_vertices_unique
                 vertex_indexes.add(f)
@@ -48,19 +48,19 @@ def read_and_create_vertices_and_edges(edges_filename, edges_coll_name, vertices
                 e = i.split(' ', 2)
                 if len(e) == 2:
                     f, t = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}"})  # Null will be inserted for weight
-                    edges.append({"_from": f"{t}", "_to": f"{f}"})  # Null will be inserted for weight
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted for weight
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}"})  # Null will be inserted for weight
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{f}", "_to": f"{t}", "weight": f'{w}'})
-                    edges.append({"_from": f"{t}", "_to": f"{f}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}", "weight": f'{w}'})
                 # add vertices
                 # this tests existence just in this bulk, globally checked in insert_vertices_unique
                 vertex_indexes.add(f)
                 vertex_indexes.add(t)
 
         insert_vertices_unique(endpoint, vertices_coll_name, vertex_indexes, smart_attribute, username, password)
-        insert_edges(endpoint, edges_coll_name, vertices_coll_name, edges, smart_attribute, username, password)
+        insert_documents(endpoint, edges_coll_name, edges, username, password)
 
 
 def import_edge_list(endpoint, filename, bulk_size,

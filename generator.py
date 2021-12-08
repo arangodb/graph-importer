@@ -2,10 +2,158 @@ import argparse
 import random
 from typing import Union, Tuple, List
 
-from general import create_graph, insert_vertices, insert_edges
+from general import create_graph, insert_documents
 
+def yes_with_prob(prob: float):
+    return random.randint(0, 1000) < prob * 1000
 
-# todo fill_tournament
+def make_clique_edges_with_missing_edges(edge_property: Union[Tuple[str, float, float], None, Tuple[str, List[str]]],
+                      vertices_coll_name: str,
+                      hasSelfLoops: bool,
+                      size: int, bulk_size: int,
+                      prob_missing: float,
+                      isDirected: bool):
+        edges = []
+        if type(edge_property) is None:
+            for i in range(size):
+                for j in range(i + 1, size):
+                    if yes_with_prob(prob_missing):
+                        edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}"})
+                        edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}"})
+                    if len(edges) >= bulk_size:
+                        yield edges
+                        edges.clear()
+                if edges:
+                    yield edges
+                    edges.clear()
+            if hasSelfLoops:
+                for i in range(size):
+                    if yes_with_prob(prob_missing):
+                        edges.extend(
+                            [{"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}"} for i in
+                                 range(size)])
+            if edges:
+                yield edges
+        else:
+            edge_property_name = edge_property[0]
+            if len(edge_property) == 3:  # Tuple, random
+                minimum = float(edge_property[1])
+                maximum = float(edge_property[2])
+                for i in range(size):
+                    for j in range(i + 1, size):
+                        if yes_with_prob(prob_missing):
+                            edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}",
+                                      edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                            edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}",
+                                      edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                        if len(edges) >= bulk_size:
+                            yield edges
+                            edges.clear()
+                    if edges:
+                        yield edges
+                        edges.clear()
+                if hasSelfLoops:
+                    for i in range(size):
+                        if yes_with_prob(prob_missing):
+                            edges.extend(
+                                {"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}",
+                                 edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                if edges:
+                    yield edges  # for the last i
+            else:  # len = 2: list of values
+                # check that the number of edge properties is correct
+                if len(edge_property[1]) != size * size:  # even if no self loops; we just don't use values at (i,i)
+                    raise RuntimeError(
+                        'make_clique_edges: with selfloops, the length of edge_property[1] must be equal to size**2.')
+
+                for i in range(size):
+                    for j in range(i + 1, size):
+                        if yes_with_prob(prob_missing):
+                            edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}",
+                                      edge_property_name: f'{edge_property[1][i * size + j]}'})
+                            edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}",
+                                      edge_property_name: f'{edge_property[1][j * size + i]}'})
+                        if len(edges) >= bulk_size:
+                            yield edges
+                            edges.clear()
+                    if edges:
+                        yield edges
+                        edges.clear()
+                if hasSelfLoops:
+                    for i in range(size):
+                        if yes_with_prob(prob_missing):
+                            edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}",
+                                      edge_property_name: f'{edge_property[1][i * size + i]}'})
+                if edges:
+                    yield edges
+
+def make_tournament_edges(edge_property: Union[Tuple[str, float, float], None, Tuple[str, List[str]]],
+                      vertices_coll_name: str,
+                      hasSelfLoops: bool,
+                      size: int, bulk_size: int):
+    '''
+    Yield at most bulk_size + 1 edges at one time.
+    :param edge_property:
+    :param hasSelfLoops:
+    :param size:
+    :param bulk_size:
+    :return: None
+    '''
+    edges = []
+    if type(edge_property) is None:
+        for i in range(size):
+            for j in range(i+1, size):
+                if random.randint(0,1):
+                    edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}"})
+                else:
+                    edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}"})
+                if len(edges) >= bulk_size:
+                    yield edges
+                    edges.clear()
+            if edges:
+                yield edges
+                edges.clear()
+        if edges:
+            yield edges
+    else:
+        edge_property_name = edge_property[0]
+        if len(edge_property) == 3:  # Tuple, random
+            minimum = float(edge_property[1])
+            maximum = float(edge_property[2])
+            for i in range(size):
+                for j in range(i+1, size):
+                    if random.randint(0,1):
+                        edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                    else:
+                        edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                    if len(edges) >= bulk_size:
+                        yield edges
+                        edges.clear()
+                if edges:
+                    yield edges
+                    edges.clear()
+            if edges:
+                yield edges # for the last i
+        else:  # len = 2: list of values
+            # check that the number of edge properties is correct
+            if len(edge_property[1]) != size * size:  # even if no self loops; we just don't use values at (i,i)
+                raise RuntimeError(
+                    'make_clique_edges: with selfloops, the length of edge_property[1] must be equal to size**2.')
+
+            for i in range(size):
+                for j in range(i+1, size):
+                    if random.randint(0,1):
+                        edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}", edge_property_name: f'{edge_property[1][i * size + j]}'})
+                    else:
+                        edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{edge_property[1][j * size + i]}'})
+                    if len(edges) >= bulk_size:
+                        yield edges
+                        edges.clear()
+                if edges:
+                    yield edges
+                    edges.clear()
+            if edges:
+                yield edges
 
 def make_vertices(vertex_property: Union[Tuple[float, float], None, List[str]], smart_attribute: str,
                   additional_attribute: str, size: int,
@@ -39,7 +187,9 @@ def make_vertices(vertex_property: Union[Tuple[float, float], None, List[str]], 
                 range(bulk_number * bulk_size, size)]
 
 
-def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple[str, List[str]]], hasSelfLoops: bool,
+def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple[str, List[str]]],
+                      vertices_coll_name: str,
+                      hasSelfLoops: bool,
                       size: int, bulk_size: int):
     '''
     Yield at most bulk_size + 1 edges at one time.
@@ -53,8 +203,8 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
     if type(edge_property) is None:
         for i in range(size):
             for j in range(i+1, size):
-                edges.append({"_from": f"{i}", "_to": f"{j}"})
-                edges.append({"_from": f"{j}", "_to": f"{i}"})
+                edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}"})
+                edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}"})
                 if len(edges) >= bulk_size:
                     yield edges
                     edges.clear()
@@ -62,7 +212,8 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
                 yield edges
                 edges.clear()
         if hasSelfLoops:
-            edges.extend([{"_from": f"{i}", "_to": f"{i}"} for i in range(size)])
+            for i in range(size):
+                edges.extend([{"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}"} for i in range(size)])
         if edges:
             yield edges
     else:
@@ -72,8 +223,8 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
             maximum = float(edge_property[2])
             for i in range(size):
                 for j in range(i+1, size):
-                    edges.append({"_from": f"{i}", "_to": f"{j}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
-                    edges.append({"_from": f"{j}", "_to": f"{i}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
                     if len(edges) >= bulk_size:
                         yield edges
                         edges.clear()
@@ -81,8 +232,9 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
                     yield edges
                     edges.clear()
             if hasSelfLoops:
-                edges.extend(
-                    {"_from": f"{i}", "_to": f"{i}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
+                for i in range(size):
+                    edges.extend(
+                        {"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{random.uniform(minimum, maximum)}'})
             if edges:
                 yield edges # for the last i
         else:  # len = 2: list of values
@@ -93,8 +245,8 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
 
             for i in range(size):
                 for j in range(i+1, size):
-                    edges.append({"_from": f"{i}", "_to": f"{j}", edge_property_name: f'{edge_property[1][i * size + j]}'})
-                    edges.append({"_from": f"{j}", "_to": f"{i}", edge_property_name: f'{edge_property[1][j * size + i]}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{j}:{j}", edge_property_name: f'{edge_property[1][i * size + j]}'})
+                    edges.append({"_from": f"{vertices_coll_name}/{j}:{j}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{edge_property[1][j * size + i]}'})
                     if len(edges) >= bulk_size:
                         yield edges
                         edges.clear()
@@ -102,7 +254,8 @@ def make_clique_edges(edge_property: Union[Tuple[str, float, float], None, Tuple
                     yield edges
                     edges.clear()
             if hasSelfLoops:
-                edges.append({"_from": f"{i}", "_to": f"{i}", edge_property_name: f'{edge_property[1][i * size + i]}'})
+                for i in range(size):
+                    edges.append({"_from": f"{vertices_coll_name}/{i}:{i}", "_to": f"{vertices_coll_name}/{i}:{i}", edge_property_name: f'{edge_property[1][i * size + i]}'})
             if edges:
                 yield edges
 
@@ -127,9 +280,9 @@ def fill_clique(endpoint: str, vertices_coll_name: str, edge_coll_name: str, sma
     '''
 
     for vertices in make_vertices(vertex_property, smart_attribute, additional_attribute, size, bulk_size):
-        insert_vertices(endpoint, vertices_coll_name, vertices, username, password)
-    for edges in make_clique_edges(edge_property, hasSelfLoops, size, bulk_size):
-        insert_edges(endpoint, edge_coll_name, vertices_coll_name, edges, smart_attribute, username, password)
+        insert_documents(endpoint, vertices_coll_name, vertices, username, password)
+    for edges in make_clique_edges(edge_property, vertices_coll_name, hasSelfLoops, size, bulk_size):
+        insert_documents(endpoint, edge_coll_name, edges, username, password)
 
 
 def create_clique(endpoint, graph_name, vertices_coll_name, edge_coll_name, replication_factor: int,
