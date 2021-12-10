@@ -1,7 +1,6 @@
 import argparse
-import os.path
-from pathlib import PurePath
 
+from databaseinfo import DatabaseInfo, GraphInfo, VertexOrEdgeProperty
 from edge_list import import_edge_list
 from graphalytics_importer import import_graphalytics_get_files, import_graphalytics
 
@@ -9,8 +8,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
     parser.add_argument('endpoint', type=str, help='Endpoint, e.g. http://localhost:8529/_db/_system')
-    parser.add_argument('sourcetype', type=str, nargs='?', default='edge-list', choices=['edge-list', 'graphalytics'],
-                        help='Source type')
+    parser.add_argument('sourcetype', type=str, nargs='?', default='edge-list',
+                        choices=['edge-list', 'graphalytics'],
+                        help='Source kind')
     parser.add_argument('--dir_graphalytics', '-d', type=str, nargs='?',
                         help='For Graphalytics graphs, the directory containing the files. '
                              'If given, overwrites possible arguments --vgf, --egf and --pgf.')
@@ -53,6 +53,14 @@ if __name__ == "__main__":
             raise Exception(
                 'With sourcetype edge-list, edges_file_edge_list must be given.')
 
+    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges,
+                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
+                           '', 'weight', args.user, args.pwd)
+
+    vertex_property = VertexOrEdgeProperty('none')
+    edge_property = VertexOrEdgeProperty('none')
+    graph_info = GraphInfo(hasSelfLoops=False, isDirected=not args.enforce_undirected, vertex_property=vertex_property,
+                           edge_property=edge_property)
     # for graphalytics, get file names from parameters
     if args.sourcetype == 'graphalytics':
         if args.dir_graphalytics:
@@ -63,12 +71,8 @@ if __name__ == "__main__":
             edges_filename = args.edges_file_graphalytics
             properties_filename = args.properties_file_graphalytics
 
-        import_graphalytics(args.endpoint, vertices_filename, edges_filename, properties_filename, args.bulk_size,
-                            args.enforce_undirected, args.graphname, args.edges, args.vertices, args.repl_factor,
-                            args.num_shards, args.overwrite, args.smart_attribute, args.user, args.pwd)
+        import_graphalytics(db_info, graph_info, vertices_filename, edges_filename, properties_filename, args.bulk_size)
         exit(0)
     if args.sourcetype == 'edge-list':
-        import_edge_list(args.endpoint, args.edges_file_edge_list, args.bulk_size,
-                         args.enforce_undirected, args.graphname, args.edges, args.vertices, args.repl_factor,
-                         args.num_shards, args.overwrite, args.smart_attribute, args.user, args.pwd)
+        import_edge_list(db_info, graph_info, args.edges_file_edge_list, args.bulk_size)
         exit(0)

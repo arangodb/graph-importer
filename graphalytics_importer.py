@@ -1,21 +1,22 @@
 import os
 from pathlib import PurePath
 
-from general import file_reader, insert_documents, create_graph
+from databaseinfo import DatabaseInfo, GraphInfo
+from general import file_reader, insert_documents, create_graph, ConverterToVertex
 
 
 def import_graphalytics_get_files(directory: str):
     '''
-    Append to the directory the filename which is the suffix of directory after the last '/' (or just directory if no '/')
-     and then append '.v', '.e' and '.properties' and return all three filenames as absolute paths. todo: test if non-absolute directory works
+    Append to the directory the filename which is the suffix of directory after the last '/'
+    (or just directory if no '/') and then append '.v', '.e' and '.properties' and return
+    all three filenames as absolute paths. todo: test if non-absolute directory works
     :param directory: the directory where Graphalytics files are expected to be. The names of the files should be
             (up to the extensions) the suffix of directory after the last '/'.
     :return: the three filenames
     '''
     graph_name = PurePath(directory).name
-    return os.path.join(directory, graph_name + '.v'), \
-           os.path.join(directory, graph_name + '.e'), \
-           os.path.join(directory, graph_name + '.properties')
+    return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e'), os.path.join(
+        directory, graph_name + '.properties')
 
 
 def graphalytics_get_directedness(properties_filename: str) -> bool:
@@ -29,26 +30,21 @@ def graphalytics_get_directedness(properties_filename: str) -> bool:
         return '.directed = true' in contents
 
 
-def read_and_create_vertices(filename, endpoint, bulk_size, vertices_coll_name, smart_attribute, username, password):
+def read_and_create_vertices(filename, db_info: DatabaseInfo, bulk_size):
     '''
-    Read vertices from the given file and insert them into the collection vertices_coll_name in bulks of size
+    Read vertices from the given file and insert them into the collection v_coll in bulks of size
     bulk_size with smart attribute smart_attribute. The vertices must be given one vertex per line as <vertex id>.
     :param filename: the filename of the file containing a list of vertices
-    :param endpoint: the server address
+    :param db_info database info (endpoint, vertices_coll_name, smart_attribute, username, password)
     :param bulk_size: the bulk size
-    :param vertices_coll_name: the name of the collection to insert vertices into
-    :param smart_attribute: the smart attribute
-    :param username: the username
-    :param password: the password
     :return: None
     '''
     for vids in file_reader(filename, bulk_size):
-        vertices = [{f'{smart_attribute}': str(vid), '_key': str(vid) + ':'+ str(vid)} for vid in vids]
-        insert_documents(endpoint, vertices_coll_name, vertices, username, password)
+        vertices = [{f'{db_info.smart_attribute}': str(vid), '_key': str(vid) + ':' + str(vid)} for vid in vids]
+        insert_documents(db_info, vertices, db_info.vertices_coll_name)
 
 
-def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, endpoint, bulk_size, isDirected,
-                          smart_attribute, username, password):
+def read_and_create_edges(edges_filename, db_info: DatabaseInfo, graph_info: GraphInfo, bulk_size):
     '''
     Read edges from the given file and insert them into the collection edges_coll_name in bulks of size
      bulk_size with smart attribute smart_attribute. The edges must be given one edge per line in the form
@@ -56,81 +52,67 @@ def read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, e
      If isDirected is False, with every edge (a,b) also the edge (b,a) with the same weight is inserted.
      Lines starting with '#' or '/' are skipped.
     :param edges_filename:
-    :param edges_coll_name:
-    :param vertices_coll_name:
-    :param endpoint:
+    :param db_info:
+    :param graph_info:
     :param bulk_size:
-    :param isDirected:
-    :param smart_attribute:
-    :param username:
-    :param password:
     :return:
     '''
-    if not isDirected:
+    to_v = ConverterToVertex(db_info.vertices_coll_name).idx_to_vertex
+    if not graph_info.isDirected:
         bulk_size //= 2
     for eids in file_reader(edges_filename, bulk_size):
         edges = list()
         if eids[0] == '#' or eids[0] == '/':
             continue
-        if isDirected:
+        if graph_info.isDirected:
             for i in eids:
                 e = i.split(' ', 2)
                 if len(e) == 2:  # no weight given
                     f, t = e
-                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted
+                    edges.append({"_from": to_v(f), "_to": to_v(t)})  # Null will be inserted
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
+                    edges.append({"_from": to_v(f), "_to": to_v(t), "weight": f'{w}'})
         else:
             for i in eids:
                 e = i.split(' ', 2)
                 if len(e) == 2:
                     f, t = e
-                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}"})  # Null will be inserted for weight
-                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}"})  # Null will be inserted for weight
+                    edges.append({"_from": to_v(f), "_to": to_v(t)})  # Null will be inserted for weight
+                    edges.append({"_from": to_v(t), "_to": to_v(f)})  # Null will be inserted for weight
                 else:
                     f, t, w = e
-                    edges.append({"_from": f"{vertices_coll_name}/{f}:{f}", "_to": f"{vertices_coll_name}/{t}:{t}", "weight": f'{w}'})
-                    edges.append({"_from": f"{vertices_coll_name}/{t}:{t}", "_to": f"{vertices_coll_name}/{f}:{f}", "weight": f'{w}'})
-        insert_documents(endpoint, edges_coll_name, edges, username, password)
+                    edges.append({"_from": to_v(f), "_to": to_v(t), "weight": f'{w}'})
+                    edges.append({"_from": to_v(t), "_to": to_v(f), "weight": f'{w}'})
+        insert_documents(db_info, edges, db_info.edge_coll_name)
 
 
-def import_graphalytics(endpoint, vertices_filename, edges_filename, properties_filename, bulk_size,
-                        enforce_undirected, graphname, edges_coll_name, vertices_coll_name, replication_factor,
-                        number_of_shards, overwrite, smart_attribute, username, password):
+def import_graphalytics(db_info: DatabaseInfo, graph_info: GraphInfo, vertices_filename, edges_filename,
+                        properties_filename, bulk_size):
     '''
-    Create a new smart graph with vertices vertices_coll_name and edges edge_coll_name with given parameters.
-     If overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
-     Read vertices from vertices_filename and insert them into vertices_coll_name in bulks of size
-     bulk_size with smart attribute smart_attribute. The vertices must be given one vertex per line as <vertex id>.
-     Read edges from edges_filename and insert them into edges_coll_name in bulks of size
-     bulk_size with smart attribute smart_attribute. The edges must be given one edge per line in the form
+    Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
+     If db_info.overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
+     Read vertices from vertices_filename and insert them into db_info.vertices_coll_name in bulks of size
+     bulk_size with smart attribute db_info.smart_attribute. The vertices must be given one vertex per line as
+     <vertex id>.
+     Read edges from edges_filename and insert them into db_info.edges_coll_name in bulks of size
+     bulk_size with smart attribute db_info.smart_attribute. The edges must be given one edge per line in the form
      <node id> <node id> [<weight>]. If the weight is not given, Null is inserted. The edges are directed
-     if enforce_undirected is false and the file properties_filename contains a substring '.directed = true',
-     otherwise, with every edge (a,b) also the edge (b,a) with the same weight is inserted.
+     if db_info.isDirected is not given or False and the file properties_filename contains
+     a substring '.directed = true', otherwise, with every edge (a,b) also the edge (b,a) with the same weight
+     is inserted.
      Lines starting with '#' or '/' are skipped.
-    :param endpoint: the server address
+    :param graph_info:
+    :param db_info: database info
     :param vertices_filename: the name of  the file to read vertices from
     :param edges_filename: the name of the file to read edges from
     :param properties_filename: the name of the file containing information about whether the graph should be directed
     :param bulk_size: the size of bulks
-    :param enforce_undirected: whether to make the graph undirected (regardless of the contents of the properties file)
-    :param graphname: the name of the graph to be created
-    :param edges_coll_name: the name of the edge collection to be created
-    :param vertices_coll_name: the name of the vertex collection to be created
-    :param replication_factor: the replication factor for the vertices
-    :param number_of_shards: the number of shards
-    :param overwrite: whether the graph and/or the vertex/edge collections should be overwritten if they exsit
-    :param smart_attribute: the smart attribute
-    :param username: the user name
-    :param password: the password
     :return: None
     '''
-    create_graph(endpoint, graphname, vertices_coll_name, edges_coll_name, replication_factor, number_of_shards,
-                 overwrite,
-                 smart_attribute, username, password)
-    read_and_create_vertices(vertices_filename, endpoint, bulk_size, vertices_coll_name, smart_attribute, username,
-                             password)
-    isDirected = False if enforce_undirected else graphalytics_get_directedness(properties_filename)
-    read_and_create_edges(edges_filename, edges_coll_name, vertices_coll_name, endpoint, bulk_size, isDirected,
-                          smart_attribute, username, password)
+    create_graph(db_info)
+    read_and_create_vertices(vertices_filename, db_info, bulk_size)
+    isDirected = graphalytics_get_directedness(
+        properties_filename) if graph_info.isDirected is None or graph_info.isDirected is False else False
+    graph_info.isDirected = isDirected
+    read_and_create_edges(edges_filename, db_info, graph_info, bulk_size)

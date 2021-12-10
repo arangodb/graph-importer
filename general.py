@@ -1,53 +1,46 @@
 import os
+from typing import Union
 
 import requests
 
+from databaseinfo import DatabaseInfo
 
-def create_graph(endpoint, graphname, vertices_coll_name, edge_coll_name, replication_factor: int,
-                 number_of_shards: int, overwrite: bool, smart_attribute: str, username: str, password: str):
+
+def create_graph(database_info: DatabaseInfo):
     '''
-    Create a new smart graph with vertices vertices_coll_name and edges edge_coll_name with given parameters.
+    Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
     If overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
-    :param endpoint: the server address
-    :param graphname: the name of the grph to create
-    :param vertices_coll_name: the name of the vertex collection to create
-    :param edge_coll_name: the name of the edge collection to create
-    :param replication_factor: the replication factor
-    :param number_of_shards: the number of shards
-    :param overwrite: whether to overwrite the  graph and the vertex and edge collections
-    :param smart_attribute: the name of the field to shard vertices after
-    :param username: the username
-    :param password: the password
+    :param database_info:
     :return: None
     '''
-    if overwrite:
+    if database_info.overwrite:
         # drop the graph (if it exists)
-        url = os.path.join(endpoint, '_api/gharial', graphname)
+        url = os.path.join(database_info.endpoint, '_api/gharial', database_info.graph_name)
         url = url + '?dropCollections=true'
-        requests.delete(url, auth=(username, password))
+        requests.delete(url, auth=(database_info.username, database_info.password))
         # drop edges
-        url = os.path.join(endpoint, '_api/collection', edge_coll_name)
-        requests.delete(url, auth=(username, password))
+        url = os.path.join(database_info.endpoint, '_api/collection', database_info.edge_coll_name)
+        requests.delete(url, auth=(database_info.username, database_info.password))
         # drop vertices
-        url = os.path.join(endpoint, '_api/collection', vertices_coll_name)
-        requests.delete(url, auth=(username, password))
+        url = os.path.join(database_info.endpoint, '_api/collection', database_info.vertices_coll_name)
+        requests.delete(url, auth=(database_info.username, database_info.password))
 
-    url = os.path.join(endpoint, '_api/gharial')
-    response = requests.post(url, auth=(username, password), json={
-        "name": graphname,
+    url = os.path.join(database_info.endpoint, '_api/gharial')
+    response = requests.post(url, auth=(database_info.username, database_info.password), json={
+        "name": database_info.graph_name,
         "edgeDefinitions": [
             {
-                "collection": edge_coll_name,
-                "from": [vertices_coll_name],
-                "to": [vertices_coll_name]
+                "collection": database_info.edge_coll_name,
+                "from": [database_info.vertices_coll_name],
+                "to": [database_info.vertices_coll_name]
             }
         ],
-        "orphanCollections": [vertices_coll_name],
+        "orphanCollections": [database_info.vertices_coll_name],
         "isSmart": "true",
         "options": {
-            "replicationFactor": replication_factor,
-            "numberOfShards": number_of_shards,
-            "smartGraphAttribute": smart_attribute
+            "replicationFactor": database_info.replication_factor,
+            "numberOfShards": database_info.number_of_shards,
+            "smartGraphAttribute": database_info.smart_attribute
         }
     })
     if response.status_code == 409:
@@ -56,9 +49,9 @@ def create_graph(endpoint, graphname, vertices_coll_name, edge_coll_name, replic
         raise RuntimeError(f'Invalid response from bulk insert{response.text}')
 
 
-def insert_vertices_unique(endpoint, vertices_coll_name, vertices, smart_attribute, username, password):
+def insert_vertices_unique(db_info: DatabaseInfo, vertices):
     doc = dict()
-    vertices = list(vertices) # convert to list
+    vertices = list(vertices)
     q = f'''
     let vertex_ids = (
             FOR vertex IN @@vertex_coll
@@ -66,33 +59,34 @@ def insert_vertices_unique(endpoint, vertices_coll_name, vertices, smart_attribu
                 )
     FOR v in @vertices
         FILTER TO_STRING(v) NOT IN vertex_ids
-        INSERT {{ {smart_attribute} : v }} INTO @@vertex_coll
+        INSERT {{ {db_info.smart_attribute} : v }} INTO @@vertex_coll
     '''
     doc['query'] = q
-    doc['bindVars'] = {'vertices': vertices, '@vertex_coll': vertices_coll_name}
-    url = os.path.join(endpoint, f"_api/cursor/")
-    response = requests.post(url, json=doc, auth=(username, password))
+    doc['bindVars'] = {'vertices': vertices, '@vertex_coll': db_info.vertices_coll_name}
+    url = os.path.join(db_info.endpoint, f"_api/cursor/")
+    response = requests.post(url, json=doc, auth=(db_info.username, db_info.password))
     if response.status_code != 201:
         raise RuntimeError(f'Invalid response from server during insert_vertices_unique: {response.text}')
 
-def insert_documents(endpoint, coll_name, documents, username, password):
+
+def insert_documents(db_info: DatabaseInfo, documents, collection_name: str):
     '''
     Insert an edge or (typically) a list of edges into the edge collection.
-    :param endpoint: the server address
-    :param coll_name: the name of the edge collection
-    :param documents: the document or (typically) the list of documents to insert
-    :param username: the username
-    :param password: the password
+    :param db_info:
+    :param documents:
+    :param collection_name:
     :return: None
     '''
-    url = os.path.join(endpoint, "_api/document/", coll_name)
-    response = requests.post(url, json=documents, auth=(username, password))
+    url = os.path.join(db_info.endpoint, "_api/document/", collection_name)
+    response = requests.post(url, json=documents, auth=(db_info.username, db_info.password))
     if response.status_code != 202:
         raise RuntimeError(f"Invalid response from bulk insert{response.text}")
 
+
 def file_reader(filename, bulk_size):
     '''
-    Yield bulk_size characters from the file with filename filename or the whole content of the file if it has less characters.
+    Yield bulk_size characters from the file with filename filename or the whole content of the file if it has less
+    characters.
     :param filename: the filename
     :param bulk_size: the number of characters to return at most
     :return: None
@@ -106,3 +100,11 @@ def file_reader(filename, bulk_size):
                 res = list()
         if len(res) != 0:
             yield res
+
+
+class ConverterToVertex:
+    def __init__(self, vertex_coll_name: str):
+        self.vertex_coll_name = vertex_coll_name
+
+    def idx_to_vertex(self, idx: Union[int, str]) -> str:
+        return str(f"{self.vertex_coll_name}/{idx}:{idx}")
