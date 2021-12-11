@@ -1,4 +1,5 @@
 import os
+import random
 from typing import Union
 
 import requests
@@ -108,3 +109,7 @@ class ConverterToVertex:
 
     def idx_to_vertex(self, idx: Union[int, str]) -> str:
         return str(f"{self.vertex_coll_name}/{idx}:{idx}")
+
+
+def yes_with_prob(prob: float):
+    return random.randint(1, 1000) < prob * 1000

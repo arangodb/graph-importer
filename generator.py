@@ -1,9 +1,9 @@
 import argparse
 import random
-from typing import Union, Tuple, List, Callable
+from typing import Union, Tuple, List, Callable, Dict
 
 from databaseinfo import DatabaseInfo, GraphInfo, CliquesGraphInfo, VertexOrEdgeProperty
-from general import create_graph, insert_documents, ConverterToVertex
+from general import create_graph, insert_documents, ConverterToVertex, yes_with_prob
 
 
 class CliquesHelper:
@@ -24,7 +24,7 @@ class CliquesHelper:
             return self.starts_of_cliques[i + 1] - self.starts_of_cliques[i]
 
     def update(self, size: int):
-        self.starts_of_cliques = self.starts_of_cliques.append(self.starts_of_cliques[-1] + size)
+        self.starts_of_cliques.append(self.starts_of_cliques[-1] + size)
         self.num_vertices += size
 
     def num_cliques(self):
@@ -32,54 +32,55 @@ class CliquesHelper:
 
 
 def num_edges_between_cliques(size1: int, size2: int):
-    return random.randint(size1, size2)
+    return random.randint(1, size1*size2)
 
 
 def make_vertices(graph_info: GraphInfo,
                   db_info: DatabaseInfo, size: int,
                   bulk_size: int):
-    bulk_number = 0
     if graph_info.vertex_property.type == "none":
-        while (bulk_number + 1) * bulk_size < size:
+        while graph_info.next_id + bulk_size <= size:
             yield [{f'{db_info.smart_attribute}': vid} for vid in
-                   range(bulk_number * bulk_size, (bulk_number + 1) * bulk_size)]
-            bulk_number += 1
+                   range(graph_info.next_id, graph_info.next_id + bulk_size)]
+            graph_info.next_id += bulk_size
+        yield [{f'{db_info.smart_attribute}': vid} for vid in
+               range(graph_info.next_id, size)]
+        graph_info.next_id += size - graph_info.next_id
     elif graph_info.vertex_property.type == "list":
         if len(graph_info.vertex_property.list) != size:
             raise RuntimeError(
                 f'make_vertices: the length of vertex_property ({len(graph_info.vertex_property.list)}) '
                 f'must be equal to size ({size}).')
-        while (bulk_number + 1) * bulk_size < size:
+        while graph_info.next_id + bulk_size <= size:
             yield [{f'{db_info.smart_attribute}': vid,
                     f'{db_info.additional_vertex_attribute}': graph_info.vertex_property.list[vid]} for vid in
-                   range(graph_info.next_id, bulk_number * bulk_size, (bulk_number + 1) * bulk_size)]
-            graph_info.next_id += bulk_number * bulk_size, (bulk_number + 1) * bulk_size
-            bulk_number += 1
+                   range(graph_info.next_id, graph_info.next_id + bulk_size)]
+            graph_info.next_id += bulk_size
+        yield [{f'{db_info.smart_attribute}': vid,
+                f'{db_info.additional_vertex_attribute}': graph_info.vertex_property.list[vid]} for vid in
+               range(graph_info.next_id, size)]
+        graph_info.next_id += size - graph_info.next_id
     # random values, kind(vertex_property) == tuple
     elif graph_info.vertex_property.type == "random":
-        while (bulk_number + 1) * bulk_size < size:
+        while graph_info.next_id + bulk_size <= size:
             yield [
                 {f'{db_info.smart_attribute}': str(vid),
                  f'{db_info.additional_vertex_attribute}': str(
                      random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))}
                 for vid in
-                range(graph_info.next_id, bulk_number * bulk_size, (bulk_number + 1) * bulk_size)]
-            graph_info.next_id = bulk_size
-            bulk_number += 1
+                range(graph_info.next_id, graph_info.next_id + bulk_size)]
+            graph_info.next_id += bulk_size
         yield [
             {f'{db_info.smart_attribute}': str(vid),
              f'{db_info.additional_vertex_attribute}': str(
                  random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))}
             for vid in
-            range(graph_info.next_id, bulk_number * bulk_size, size)]
+            range(graph_info.next_id, size)]
+        graph_info.next_id += size - graph_info.next_id
     else:
         raise RuntimeError(
             f"Wrong vertex property kind: {graph_info.vertex_property.type}. "
             f"Allowed values are \'none\', \'list\' and \'random\'.")
-
-
-def yes_with_prob(prob: float):
-    return random.randint(1, 1000) < prob * 1000
 
 
 # todo make a recordable seed
@@ -108,7 +109,7 @@ def connect_cliques(clique_helper: CliquesHelper, density: float, num_e_between_
     for i in range(clique_helper.num_cliques()):
         for j in range(i + 1, clique_helper.num_cliques()):
             if not yes_with_prob(density):
-                continue
+                continue  # todo refactor, make faster
             size_i = clique_helper.size_of_clique(i)
             size_j = clique_helper.size_of_clique(j)
             num_edges = num_e_between_cliques(size_i, size_j)
@@ -131,32 +132,43 @@ def connect_cliques(clique_helper: CliquesHelper, density: float, num_e_between_
 
 def make_edges_generalized_clique(db_info: DatabaseInfo,
                                   graph_info: GraphInfo,
+                                  c_helper: CliquesHelper,
+                                  clique_idx: int,
                                   size: int, bulk_size: int,
                                   prob_missing: float):
+    def append_edges(edges: List[Dict], isDirected: bool, f: int, t: int, attr_name: str = None,
+                     attr_value: str = None):
+        doc = {"_from": to_v(f), "_to": to_v(t)}
+        if attr_name:
+            doc[attr_name] = attr_value
+        edges.append(doc)
+        if not isDirected:
+            doc = {"_from": to_v(t), "_to": to_v(f)}
+            if attr_name:
+                doc[attr_name] = attr_value
+            edges.append(doc)
+
     edges = []
     to_v = ConverterToVertex(db_info.vertices_coll_name).idx_to_vertex
 
-    next_id = graph_info.next_id
-    graph_info.next_id += (size - 1) * size
-    for i in range(next_id, size):
-        for j in range(i + 1, size):
+    # last entry in c_helper.starts_of_cliques is for the next clique
+
+    c_begin = c_helper.starts_of_cliques[clique_idx]
+    c_end = c_helper.starts_of_cliques[clique_idx + 1] if clique_idx < len(c_helper.starts_of_cliques) else size
+
+    # have a clique now
+    for i in range(c_begin, c_end):
+        for j in range(i + 1, c_end):  # todo randomly find num_edges, iterate over edges, find endpoints randomly
             if yes_with_prob(prob_missing):
-                return []
+                continue
             if graph_info.edge_property.type == 'none':
-                edges.append({"_from": to_v(i), "_to": to_v(j)})
-                edges.append({"_from": to_v(j), "_to": to_v(i)})
+                append_edges(edges, graph_info.isDirected, i, j)
             elif graph_info.edge_property.type == 'list':
-                edges.append({"_from": to_v(i), "_to": to_v(j),
-                              db_info.edge_coll_name: graph_info.edge_property.list[i * size + j]})
-                edges.append({"_from": to_v(j), "_to": to_v(i),
-                              db_info.edge_coll_name: graph_info.edge_property.list[j * size + i]})
+                append_edges(edges, graph_info.isDirected, i, j, db_info.edge_coll_name,
+                             graph_info.edge_property.list[i * size + j])
             elif graph_info.edge_property.type == 'random':
-                edges.append({"_from": to_v(i), "_to": to_v(j),
-                              db_info.edge_coll_name: str(
-                                  random.uniform(graph_info.edge_property.min, graph_info.edge_property.max))})
-                edges.append({"_from": to_v(j), "_to": to_v(i),
-                              db_info.edge_coll_name: str(
-                                  random.uniform(graph_info.edge_property.min, graph_info.edge_property.max))})
+                append_edges(edges, graph_info.isDirected, i, j, db_info.edge_coll_name,
+                             str(random.uniform(graph_info.edge_property.min, graph_info.edge_property.max)))
             else:
                 raise RuntimeError(
                     f"Wrong vertex property kind: {graph_info.vertex_property.type}. "
@@ -210,26 +222,29 @@ def make_tournament_edges(edge_prop: Union[str, None, Tuple[str, List[str]]],
         yield edges
 
 
-def create_clique(db_info: DatabaseInfo,
-                  bulk_size,
-                  size: int,
-                  graph_info: GraphInfo):
-    create_graph(db_info)
-
-    make_and_insert_vertices(db_info, graph_info, size, bulk_size)
-    make_and_insert_edges(db_info, graph_info, size, bulk_size, 0.0)
-
-
 def make_and_insert_vertices(db_info: DatabaseInfo,
-                             graph_info: GraphInfo, size: int, bulk_size: int):
+                             graph_info: GraphInfo, c_helper: CliquesHelper, size: int, bulk_size: int):
     for vertices in make_vertices(graph_info, db_info, size, bulk_size):
         insert_documents(db_info, vertices, db_info.vertices_coll_name)
+    c_helper.update(size)
 
 
-def make_and_insert_edges(db_info: DatabaseInfo, graph_info: GraphInfo, size: int, bulk_size: int,
-                          prob_missing: float):
-    for edges in make_edges_generalized_clique(db_info, graph_info, size, bulk_size, prob_missing):
+def make_and_insert_clique_edges(db_info: DatabaseInfo, graph_info: GraphInfo, c_helper: CliquesHelper,
+                                 clique_idx: int, size: int, bulk_size: int, prob_missing: float):
+    for edges in make_edges_generalized_clique(db_info, graph_info, c_helper, clique_idx, size, bulk_size,
+                                               prob_missing):
         insert_documents(db_info, edges, db_info.edge_coll_name)
+
+
+def create_clique_graph(db_info: DatabaseInfo,
+                        bulk_size,
+                        size: int,
+                        graph_info: GraphInfo):
+    create_graph(db_info)
+    c_helper = CliquesHelper()
+    make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size)
+    make_and_insert_clique_edges(db_info, graph_info, c_helper,
+                                 clique_idx=0, size=size, bulk_size=bulk_size, prob_missing=0.0)
 
 
 def create_cliques_graph(db_info: DatabaseInfo,
@@ -241,16 +256,15 @@ def create_cliques_graph(db_info: DatabaseInfo,
 
     # create the cliques
 
-    c_help = CliquesHelper()
+    c_helper = CliquesHelper()
 
     for i in range(c_graph_info.num_cliques):
         size = random.randint(c_graph_info.min_size_clique, c_graph_info.max_size_clique)
-        c_help.update(size)
-        make_and_insert_vertices(db_info, graph_info, size, bulk_size)
-        make_and_insert_edges(db_info, graph_info, size, bulk_size, c_graph_info.prob_missing)
+        make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size)
+        make_and_insert_clique_edges(db_info, graph_info, c_helper, i, size, bulk_size, c_graph_info.prob_missing)
 
     # create edges between cliques
-    connect_cliques(c_help, c_graph_info.inter_cliques_density, c_graph_info.num_edges_between_cliques,
+    connect_cliques(c_helper, c_graph_info.inter_cliques_density, c_graph_info.num_edges_between_cliques,
                     db_info.vertices_coll_name, bulk_size, graph_info.isDirected)
 
 
@@ -271,18 +285,21 @@ if __name__ == "__main__":
                         help='The number of vertices.')
 
     # cliques-graph parameters
-    parser.add_argument('--num_cliques', help='Number of cliques in a cliques-graph. Ignored for other graphs.')
-    parser.add_argument('--min_size_clique', help='Minimum clique size in a cliques-graph. Ignored for other graphs.')
-    parser.add_argument('--max_size_clique', help='Maximum clique size in a cliques-graph. Ignored for other graphs.')
-    parser.add_argument('--prob_missing',
+    parser.add_argument('--num_cliques', type=int,
+                        help='Number of cliques in a cliques-graph. Ignored for other graphs.')
+    parser.add_argument('--min_size_clique', type=int,
+                        help='Minimum clique size in a cliques-graph. Ignored for other graphs.')
+    parser.add_argument('--max_size_clique', type=int,
+                        help='Maximum clique size in a cliques-graph. Ignored for other graphs.')
+    parser.add_argument('--prob_missing', type=float,
                         help='The probability for an edge in a clique to be missing  in a cliques-graph. '
                              'Ignored for other graphs.')
-    parser.add_argument('--inter_cliques_density',
+    parser.add_argument('--inter_cliques_density', type=float,
                         help='The probability that there are edges between two cliques in a cliques-graph. '
                              'Ignored for other graphs.')
-    parser.add_argument('--num_edges_between_cliques', type=str, choices=['random'], default='random',
-                        help='The name of a function that given the sizes of two cliques that must have edges'
-                             'between them returns this number in a cliques-graph. Currently only \'random\' is'
+    parser.add_argument('--num_edges_between_cliques', type=int, default=1,
+                        help='The name of a function that given the sizes of two cliques that must have edges '
+                             'between them returns this number in a cliques-graph. Currently only \'random\' is '
                              'implemented. Ignored for other graphs.')
 
     # database parameters
@@ -343,25 +360,40 @@ if __name__ == "__main__":
         if len(args.vertex_property) != 2:
             raise RuntimeError(
                 'If --vertex_property_type is \'random\', --vertex_property must have exactly two arguments.')
-        v_property = VertexOrEdgeProperty('random', args.vertex_property[0], args.vertex_property[1])
+        v_property = VertexOrEdgeProperty('random', float(args.vertex_property[0]), float(args.vertex_property[1]))
     else:  # remains list values
-        if len(args.vertex_property) != args.size * args.size:
-            raise RuntimeError(
-                'If --vertex_property_type is \'list\', --vertex_property must have exactly --size many arguments.')
+        if args.graphtype == 'clique':
+            if len(args.vertex_property) < args.size:
+                raise RuntimeError(
+                    'If --vertex_property_type is \'list\' and --graphtype == \'clique\', --vertex_property must have '
+                    'exactly --size many arguments.')
+        if args.graphtype == 'cliques-graph':
+            if len(args.vertex_property) < args.num_cliques * args.max_size_clique:
+                raise RuntimeError(
+                    'If --vertex_property_type is \'list\' and --graphtype == \'cliques-graph\', --vertex_property must '
+                    'have at least args.num_cliques * args.max_size_clique many arguments.')
         v_property = VertexOrEdgeProperty('list', val_list=list(args.vertex_property))
 
     if not args.edge_property_type or args.edge_property_type == 'none':
         edge_property = None
     elif args.edge_property_type == 'random':
-        if len(args.edge_property) != 2:
+        if len(args.edge_prop) != 2:
             raise RuntimeError(
                 'If --edge_property_type is \'random\', --edge_prop must have exactly two arguments.')
-        edge_property = VertexOrEdgeProperty('random', args.edge_property[0], args.edge_property[1])
+        edge_property = VertexOrEdgeProperty('random', float(args.edge_prop[0]), float(args.edge_prop[1]))
     else:  # remains list values
-        if len(args.edge_property) != args.size * args.size:
-            raise RuntimeError(
-                'If --edge_property_type is \'list\', --edge_prop must have exactly --size^2 many arguments.')
-        edge_property = VertexOrEdgeProperty('list', val_list=list(args.edge_property))
+        if args.graphtype == 'clique':
+            if len(args.edge_prop) < args.size * args.size:
+                raise RuntimeError(
+                    'If --edge_property_type is \'list\' and --graphtype == \'clqiue\', --edge_prop must have '
+                    'at least (--size)^2 many arguments.')
+        if args.graphtype == 'cliques-graph':
+            if len(args.edge_prop) < (args.num_cliques * args.max_size_clique)**2:
+                raise RuntimeError(
+                    'If --edge_property_type is \'list\' and --graphtype == \'clqiues-graph\', --edge_prop must have '
+                    'at least (args.num_cliques * args.max_size_clique)^2 many arguments.')
+
+        edge_property = VertexOrEdgeProperty('list', val_list=list(args.edge_prop))
 
     database_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.repl_factor,
                                  args.num_shards, args.overwrite, args.smart_attribute,
@@ -376,4 +408,4 @@ if __name__ == "__main__":
                                              args.prob_missing, args.inter_cliques_density, num_edges_between_cliques)
         create_cliques_graph(database_info, g_info, clique_graph_info, args.bulk_size)
     else:  # must be clique as args.graphtype has choices == ['clique', 'cliques-graph']
-        create_clique(database_info, args.bulk_size, args.size, g_info)
+        create_clique_graph(database_info, args.bulk_size, args.size, g_info)
