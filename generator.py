@@ -7,6 +7,7 @@ from clique_generator import CliquesHelper, create_clique_graph, create_cliques_
 from databaseinfo import DatabaseInfo, GraphInfo, CliquesGraphInfo, VertexOrEdgeProperty
 from general import insert_documents, yes_with_prob, arangodIsRunning, \
     get_time_difference_string
+from k_partite_generator import create_k_partite_graph
 
 
 def make_vertices(graph_info: GraphInfo,
@@ -102,6 +103,49 @@ def make_and_insert_vertices(db_info: DatabaseInfo,
         insert_documents(db_info, vertices, db_info.vertices_coll_name)
     c_helper.update(size)
 
+def get_vertex_property(args) -> VertexOrEdgeProperty:
+    if not args.vertex_property_type or args.vertex_property_type == 'none':
+        v_property = None
+    elif args.vertex_property_type == 'random':
+        if len(args.vertex_property) != 2:
+            raise RuntimeError(
+                'If --vertex_property_type is \'random\', --vertex_property must have exactly two arguments.')
+        v_property = VertexOrEdgeProperty('random', float(args.vertex_property[0]), float(args.vertex_property[1]))
+    else:  # remains list values
+        if args.graphtype == 'clique':
+            if len(args.vertex_property) < args.size:
+                raise RuntimeError(
+                    'If --vertex_property_type is \'list\' and --graphtype == \'clique\', --vertex_property must have '
+                    'exactly --size many arguments.')
+        if args.graphtype == 'cliques-graph':
+                raise RuntimeError(
+                    'If --graphtype == \'cliques-graph\', --vertex_property_type == \'list\' is not allowed.')
+        v_property = VertexOrEdgeProperty('list', val_list=list(args.vertex_property))
+    return v_property
+
+
+def get_edge_property(a) -> Union[None, VertexOrEdgeProperty]:
+    if not a.edge_property_type or a.edge_property_type == 'none':
+        return None
+    elif a.edge_property_type == 'random':
+        if len(a.edge_prop) != 2:
+            raise RuntimeError(
+                'If --edge_property_type is \'random\', --edge_prop must have exactly two arguments.')
+        return VertexOrEdgeProperty('random', float(a.edge_prop[0]), float(a.edge_prop[1]))
+    else:  # remains list values
+        if a.graphtype == 'clique':
+            if len(a.edge_prop) < a.size * a.size:
+                raise RuntimeError(
+                    'If --edge_property_type is \'list\' and --graphtype == \'clqiue\', --edge_prop must have '
+                    'at least (--size)^2 many arguments.')
+        if a.graphtype == 'cliques-graph':
+            if len(a.edge_prop) < (a.num_cliques * a.max_size_clique) ** 2:
+                raise RuntimeError(
+                    'If --edge_property_type is \'list\' and --graphtype == \'clqiues-graph\', --edge_prop must have '
+                    'at least (a.num_cliques * a.max_size_clique)^2 many arguments.')
+
+        return VertexOrEdgeProperty('list', val_list=list(a.edge_prop))
+
 
 if __name__ == "__main__":
     if not arangodIsRunning():
@@ -115,7 +159,7 @@ if __name__ == "__main__":
                         help='The number of vertices/edges written in one go.')
 
     # general graph parameters
-    parser.add_argument('graphtype', type=str, default='clique', choices=['clique', 'cliques-graph'],
+    parser.add_argument('graphtype', type=str, default='clique', choices=['clique', 'cliques-graph', 'k-partite'],
                         help='Source kind')
     parser.add_argument('--hasSelfLoops', action='store_true',  # default: false
                         help='Whether the graphs should have selfloops.')
@@ -139,6 +183,14 @@ if __name__ == "__main__":
                         help='The density of edges between two cliques, i.e., if the cliques have sizes s1 and s2, '
                              'and there are m edges between the two cliques, the density is m/(s1*s2).')
 
+    # k-partite parameters
+    parser.add_argument('--num_parts', '-k', type=int,
+                        help='Number of parts in a k-partite graph. Ignored for other graphs.')
+    parser.add_argument('--min_size_part', type=int,
+                        help='Minimum part size in a k-partite graph. Ignored for other graphs.')
+    parser.add_argument('--max_size_part', type=int,
+                        help='Maximum part size in a k-partite graph. Ignored for other graphs.')
+
     # database parameters
     parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
     parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
@@ -151,6 +203,8 @@ if __name__ == "__main__":
                         help='The name of the attribute to shard the vertices after.')
     parser.add_argument('--overwrite', action='store_true',  # default: false
                         help='Overwrite the graph and the collection if they already exist.')
+    parser.add_argument('--make_smart', action='store_false',  # default: true
+                        help='Create a smart graph.')
 
     # attributes
     # todo: check allow input file
@@ -167,7 +221,6 @@ if __name__ == "__main__":
                             randomly with equal probability from the interval [a,b). 
                             If --vertex_property_type is \'list\', a list of values of length exactly the number
                             of vertices in the graph must be given.""")
-    # todo make as for vertices
     parser.add_argument('--edge_property_type', nargs='?', choices=['none', 'random', 'list'], default='none',
                         help="""Edge property kind. Default is \'none\', then --edge_prop is ignored and 
                              the default property 'weight' with values Null is saved. 
@@ -191,46 +244,11 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if not args.vertex_property_type or args.vertex_property_type == 'none':
-        v_property = None
-    elif args.vertex_property_type == 'random':
-        if len(args.vertex_property) != 2:
-            raise RuntimeError(
-                'If --vertex_property_type is \'random\', --vertex_property must have exactly two arguments.')
-        v_property = VertexOrEdgeProperty('random', float(args.vertex_property[0]), float(args.vertex_property[1]))
-    else:  # remains list values
-        if args.graphtype == 'clique':
-            if len(args.vertex_property) < args.size:
-                raise RuntimeError(
-                    'If --vertex_property_type is \'list\' and --graphtype == \'clique\', --vertex_property must have '
-                    'exactly --size many arguments.')
-        if args.graphtype == 'cliques-graph':
-                raise RuntimeError(
-                    'If --graphtype == \'cliques-graph\', --vertex_property_type == \'list\' is not allowed.')
-        v_property = VertexOrEdgeProperty('list', val_list=list(args.vertex_property))
+    v_property = get_vertex_property(args)
+    edge_property = get_edge_property(args)
 
-    if not args.edge_property_type or args.edge_property_type == 'none':
-        edge_property = None
-    elif args.edge_property_type == 'random':
-        if len(args.edge_prop) != 2:
-            raise RuntimeError(
-                'If --edge_property_type is \'random\', --edge_prop must have exactly two arguments.')
-        edge_property = VertexOrEdgeProperty('random', float(args.edge_prop[0]), float(args.edge_prop[1]))
-    else:  # remains list values
-        if args.graphtype == 'clique':
-            if len(args.edge_prop) < args.size * args.size:
-                raise RuntimeError(
-                    'If --edge_property_type is \'list\' and --graphtype == \'clqiue\', --edge_prop must have '
-                    'at least (--size)^2 many arguments.')
-        if args.graphtype == 'cliques-graph':
-            if len(args.edge_prop) < (args.num_cliques * args.max_size_clique) ** 2:
-                raise RuntimeError(
-                    'If --edge_property_type is \'list\' and --graphtype == \'clqiues-graph\', --edge_prop must have '
-                    'at least (args.num_cliques * args.max_size_clique)^2 many arguments.')
-
-        edge_property = VertexOrEdgeProperty('list', val_list=list(args.edge_prop))
-
-    database_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.repl_factor,
+    database_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.make_smart,
+                                 args.repl_factor,
                                  args.num_shards, args.overwrite, args.smart_attribute,
                                  args.additional_vertex_attribute,
                                  args.edge_attribute,
@@ -238,14 +256,17 @@ if __name__ == "__main__":
 
     g_info = GraphInfo(args.hasSelfLoops, False, v_property, edge_property)
 
+    start = time.time()
     if args.graphtype == 'cliques-graph':
         clique_graph_info = CliquesGraphInfo(args.num_cliques, args.min_size_clique, args.max_size_clique,
                                              args.prob_missing, args.inter_cliques_density,
                                              args.density_between_two_cliques)
-        start = time.time()
         create_cliques_graph(database_info, g_info, clique_graph_info, args.bulk_size)
-        print('Time: ' + get_time_difference_string(time.time() - start))
-    else:  # must be clique as args.graphtype has choices == ['clique', 'cliques-graph']
-        start = time.time()
+    elif args.graphtype == 'clique':
         create_clique_graph(database_info, args.bulk_size, args.size, g_info)
-        print('Time: ' + get_time_difference_string(time.time() - start))
+    elif args.graphtype == 'k-partite':
+        parts_graph_info = CliquesGraphInfo(args.num_parts, args.min_size_clique, args.max_size_clique, 0.0, 0.0, 0.0)
+        create_k_partite_graph(database_info, g_info, parts_graph_info, args.bulk_size)
+    else:
+        pass
+    print('Time: ' + get_time_difference_string(time.time() - start))
