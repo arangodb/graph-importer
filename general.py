@@ -2,6 +2,7 @@ import os
 import random
 from typing import Union
 
+from psutil import process_iter, NoSuchProcess, AccessDenied, ZombieProcess
 import requests
 
 from databaseinfo import DatabaseInfo
@@ -113,3 +114,17 @@ class ConverterToVertex:
 
 def yes_with_prob(prob: float):
     return random.randint(1, 1000) < prob * 1000
+
+def arangodIsRunning():
+    '''
+    Check if arangod is running.
+    '''
+    for proc in process_iter():
+        try:
+            # Check if process name contains the given name string.
+            if 'arangod' in proc.name():
+                return True
+        except (NoSuchProcess, AccessDenied, ZombieProcess):
+            pass
+    return False
+

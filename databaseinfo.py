@@ -32,23 +32,25 @@ class VertexOrEdgeProperty:
 
 
 class CliquesGraphInfo:
+    inter_cliques_density: float
+
     def __init__(self,
                  num_cliques: int, min_size_clique: int, max_size_clique: int,
-                 prob_missing: float, inter_cliques_density: float,
-                 num_edges_between_cliques: Callable[[int, int], int]):
+                 prob_missing: float, inter_cliques_density: float, density_between_two_cliques: float):
         '''
         Information for cliques-graph construction. The graph is the result of the following construction.
         Make a graph with num_cliques many vertices, add edges with probability inter_cliques_density.
         Then replace every vertex v by a set V_v of vertices of size randomly chosen between min_size_clique and
-        max_size_clique with equal probability. Replace edges vw by num_edges_between_cliques(|V_v|, |V_w|) edges
-        between the cliques, choosing endpoints in the cliques randomly with equal distribution.
-        :param num_cliques: number
+        max_size_clique with equal probability. Remove edges vw and insert every edge between V_v and V_w with
+        probability density_between_two_cliques.
+        :param num_cliques: number of cliques
         :param min_size_clique:
         :param max_size_clique:
         :param prob_missing:
         :param inter_cliques_density:
+        :param density_between_two_cliques:
         '''
-        self.num_edges_between_cliques = num_edges_between_cliques
+        self.density_between_two_cliques = density_between_two_cliques
         self.num_cliques = num_cliques
         self.min_size_clique = min_size_clique
         self.max_size_clique = max_size_clique

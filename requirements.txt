@@ -1,3 +1,5 @@
+psutil
+tqdm
 argparse
 PurePath
 os

@@ -131,8 +131,7 @@ The script `generator.py` has at least two arguments:
     The real value is computed randomly with equal distribution between `a` and `b`. If `--vertex_property_type` is 
     `list`, a space separated list of values. The length of the list for graph type `clique` must be at least 
     - `(--size)^2` (even if there are no self-loops). 
-    For graph type `cliques-graph` it must be at least `(--num_cliques * --max_size_clique)^2` (even if there are 
-    no self-loops).
+    For graph type `cliques-graph`, `list` is not allowed.
   - clique parameters:
     - `--size`: the number of vertices in the clique
   - cliques graph parameters:
@@ -140,8 +139,6 @@ The script `generator.py` has at least two arguments:
     - `--min_size_clique`: the (non-strict) lower bound for the size of a clique
     - `--max_size_clique`: the (non-strict) upper bound for the size of a clique
     - `--prob_missing`: the probability for an edge in a clique to be missing
-    - `--inter_cliques_density`: the probability there there are some edges between two cliques
-    - `--num_edges_between_cliques`: the name of a function that given the sizes of two cliques
-    returns the number of edges to create between those cliques. Currently only `random` is implemented
-    which chooses the number of edges between 1 and the product of the cliques' sizes 
-    with equal probability.
+    - `--inter_cliques_density`: the probability there are some edges between two cliques
+    - `--density_between_two_cliques`: the density of edges between two cliques, i.e., if the cliques have sizes s1 and s2, '
+                             'and there are m edges between the two cliques, the density is m/(s1*s2).
