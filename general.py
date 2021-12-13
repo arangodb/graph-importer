@@ -128,3 +128,10 @@ def arangodIsRunning():
             pass
     return False
 
+
+def get_time_difference_string(t_diff: float) -> str:
+    t_diff = int(t_diff * 100) / 100
+    hours = str(t_diff // 3600) + " h " if t_diff > 3600 else ""
+    minutes = f'{int(t_diff % 3600 // 60)}' + " min " if hours or t_diff % 3600 > 60 else ""
+    secs = f'{t_diff % 60:2.2f}' + " sec"
+    return(hours + minutes + secs)

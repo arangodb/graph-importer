@@ -1,11 +1,13 @@
 import argparse
 import random
+import time
 from typing import Union, Tuple, List, Dict, Iterable, Callable
 
 from tqdm import tqdm
 
 from databaseinfo import DatabaseInfo, GraphInfo, CliquesGraphInfo, VertexOrEdgeProperty
-from general import create_graph, insert_documents, ConverterToVertex, yes_with_prob, arangodIsRunning
+from general import create_graph, insert_documents, ConverterToVertex, yes_with_prob, arangodIsRunning, \
+    get_time_difference_string
 
 
 class CliquesHelper:
@@ -285,7 +287,6 @@ def create_cliques_graph(db_info: DatabaseInfo,
                                  db_info.vertices_coll_name, bulk_size, graph_info.isDirected):
         insert_documents(db_info, edges, db_info.edge_coll_name)
 
-
 if __name__ == "__main__":
     if not arangodIsRunning():
         raise RuntimeError('The process \'arangod\' is not running, please, run it first.')
@@ -425,6 +426,10 @@ if __name__ == "__main__":
         clique_graph_info = CliquesGraphInfo(args.num_cliques, args.min_size_clique, args.max_size_clique,
                                              args.prob_missing, args.inter_cliques_density,
                                              args.density_between_two_cliques)
+        start = time.time()
         create_cliques_graph(database_info, g_info, clique_graph_info, args.bulk_size)
+        print('Time: ' + get_time_difference_string(time.time() - start))
     else:  # must be clique as args.graphtype has choices == ['clique', 'cliques-graph']
+        start = time.time()
         create_clique_graph(database_info, args.bulk_size, args.size, g_info)
+        print('Time: ' + get_time_difference_string(time.time() - start))
