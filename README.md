@@ -3,12 +3,15 @@
 This repository contains command line Python scripts to import graphs from external sources as files into a running instance of `arangod`
 and to generate graphs in a running instance.
 
-#Importing Graphs
+# Importing Graphs
+
 The graphs be stored in a local file. Two formats are accepted: graphs from the 
 [Graphalytics repository](https://graphalytics.org/) and graphs saved in one file as a list of edges,
 possiblly with weights. In the following we describe the accepted formats. It is expected that the files 
 are well-formed.
-##Grapahlytics Format
+
+## Grapahlytics Format
+
 A Graphalytics graph is stored in multiple files. Our script uses only three of them:
   - the file containing vertices have the extension `.v` and list vertex ids, which are natural numbers, one vertex 
 per line, e.g., 
@@ -26,11 +29,14 @@ per line, e.g.,
   ```
   - the property file contains (among other information) the substring `.directed = ` followed by `true` 
   or `false`.
-##Edge list format
+## Edge list format
+
 A graph is stored in a single file that has the same format as the edge files in Graphalytics format except
 that it may contain comment lines starting with `#`, `%` or `/` and the weighs are any sequences of 
 characters without whitespaces.
-##How to import
+
+## How to import
+
 The import script is `importer.py`. You can call with the option `-h` to obtain detailed information on
 its options that we describe here as well. The examples are given for a *nix system. 
   - The only necessary parameter is the address of the server running
@@ -78,7 +84,9 @@ an ArangoDB instance:
        - `--dir_graphalytics`: the directory containing (at least) the three files
   - edge list properties:
     - `--edges_file_edge_list`: the file containing the list of edges
+
 # Generating Graphs
+
   The script name is `generator.py`. It can create two types of graphs: undirected cliques and the
   cliques graphs. An undirected clique is a graph where every vertex has an edge to every other vertex
   and, possibly, self-loops. A cliques graph is a graph that is the result of the following construction.
@@ -92,6 +100,7 @@ an ArangoDB instance:
   between the cliques, choosing endpoints in the cliques randomly with equal distribution.
   
 ## How to Generate
+
 The script `generator.py` has at least two arguments:
   - the address of the server running an ArangoDB instance and
   - the graph type (`clique` or `cliques-graph`), e.g., 
