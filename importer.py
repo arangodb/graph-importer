@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 import argparse
+import time
 
 from databaseinfo import DatabaseInfo, GraphInfo, VertexOrEdgeProperty
 from edge_list import import_edge_list
+from general import get_time_difference_string
 from graphalytics_importer import import_graphalytics_get_files, import_graphalytics
 
 if __name__ == "__main__":
@@ -72,8 +74,12 @@ if __name__ == "__main__":
             edges_filename = args.edges_file_graphalytics
             properties_filename = args.properties_file_graphalytics
 
+        start = time.time()
         import_graphalytics(db_info, graph_info, vertices_filename, edges_filename, properties_filename, args.bulk_size)
+        print('Time: ' + get_time_difference_string(time.time() - start))
         exit(0)
     if args.sourcetype == 'edge-list':
+        start = time.time()
         import_edge_list(db_info, graph_info, args.edges_file_edge_list, args.bulk_size)
+        print('Time: ' + get_time_difference_string(time.time() - start))
         exit(0)
