@@ -157,7 +157,7 @@ def read_and_create_edges(edges_filename, properties_filename, db_info: Database
     print('Time for edges: ' + get_time_difference_string(time.time() - start_e))
 
 def import_graphalytics(db_info: DatabaseInfo, graph_info: GraphInfo, vertices_filename, edges_filename,
-                        properties_filename, bulk_size):
+                        properties_filename, bulk_size, isSmart: bool=False):
     '''
     Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
      If db_info.overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
@@ -171,6 +171,7 @@ def import_graphalytics(db_info: DatabaseInfo, graph_info: GraphInfo, vertices_f
      a substring '.directed = true', otherwise, with every edge (a,b) also the edge (b,a) with the same weight
      is inserted.
      Lines starting with '#' or '/' are skipped.
+    :param isSmart: whether the graph should be a smartGraph
     :param graph_info:
     :param db_info: database info
     :param vertices_filename: the name of  the file to read vertices from

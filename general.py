@@ -8,43 +8,60 @@ import requests
 from databaseinfo import DatabaseInfo
 
 
-def create_graph(database_info: DatabaseInfo):
+def create_graph(db_info: DatabaseInfo):
     '''
     Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
     If overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
-    :param database_info:
+    :param db_info:
     :return: None
     '''
-    if database_info.overwrite:
+    if db_info.overwrite:
         # drop the graph (if it exists)
-        url = os.path.join(database_info.endpoint, '_api/gharial', database_info.graph_name)
+        url = os.path.join(db_info.endpoint, '_api/gharial', db_info.graph_name)
         url = url + '?dropCollections=true'
-        requests.delete(url, auth=(database_info.username, database_info.password))
+        requests.delete(url, auth=(db_info.username, db_info.password))
         # drop edges
-        url = os.path.join(database_info.endpoint, '_api/collection', database_info.edge_coll_name)
-        requests.delete(url, auth=(database_info.username, database_info.password))
+        url = os.path.join(db_info.endpoint, '_api/collection', db_info.edge_coll_name)
+        requests.delete(url, auth=(db_info.username, db_info.password))
         # drop vertices
-        url = os.path.join(database_info.endpoint, '_api/collection', database_info.vertices_coll_name)
-        requests.delete(url, auth=(database_info.username, database_info.password))
+        url = os.path.join(db_info.endpoint, '_api/collection', db_info.vertices_coll_name)
+        requests.delete(url, auth=(db_info.username, db_info.password))
 
-    url = os.path.join(database_info.endpoint, '_api/gharial')
-    response = requests.post(url, auth=(database_info.username, database_info.password), json={
-        "name": database_info.graph_name,
-        "edgeDefinitions": [
-            {
-                "collection": database_info.edge_coll_name,
-                "from": [database_info.vertices_coll_name],
-                "to": [database_info.vertices_coll_name]
+    url = os.path.join(db_info.endpoint, '_api/gharial')
+    if db_info.isSmart:
+        response = requests.post(url, auth=(db_info.username, db_info.password), json={
+            "name": db_info.graph_name,
+            "edgeDefinitions": [
+                {
+                    "collection": db_info.edge_coll_name,
+                    "from": [db_info.vertices_coll_name],
+                    "to": [db_info.vertices_coll_name]
+                }
+            ],
+            "orphanCollections": [db_info.vertices_coll_name],
+            "isSmart": "true",
+            "options": {
+                "replicationFactor": db_info.replication_factor,
+                "numberOfShards": db_info.number_of_shards,
+                "smartGraphAttribute": db_info.smart_attribute
             }
-        ],
-        "orphanCollections": [database_info.vertices_coll_name],
-        "isSmart": "true",
-        "options": {
-            "replicationFactor": database_info.replication_factor,
-            "numberOfShards": database_info.number_of_shards,
-            "smartGraphAttribute": database_info.smart_attribute
-        }
-    })
+        })
+    else:
+        response = requests.post(url, auth=(db_info.username, db_info.password), json={
+            "name": db_info.graph_name,
+            "edgeDefinitions": [
+                {
+                    "collection": db_info.edge_coll_name,
+                    "from": [db_info.vertices_coll_name],
+                    "to": [db_info.vertices_coll_name]
+                }
+            ],
+            "orphanCollections": [db_info.vertices_coll_name],
+            "options": {
+                "replicationFactor": db_info.replication_factor,
+                "numberOfShards": db_info.number_of_shards
+            }
+        })
     if response.status_code == 409:
         raise RuntimeError(f'The graph or the edge collection already exist. Server response: {response.text}')
     if response.status_code not in [201, 202]:

@@ -41,6 +41,8 @@ if __name__ == "__main__":
                         help='The name of the field to shard the vertices after.')
     parser.add_argument('--overwrite', action='store_true',  # default: false
                         help='Overwrite the graph and the collection if they already exist.')
+    parser.add_argument('--make_smart', action='store_false',  # default: true
+                        help='Create a smart graph.')
 
     args = parser.parse_args()
 
@@ -56,7 +58,7 @@ if __name__ == "__main__":
             raise Exception(
                 'With sourcetype edge-list, edges_file_edge_list must be given.')
 
-    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges,
+    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.make_smart,
                            args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
                            '', 'weight', args.user, args.pwd)
 

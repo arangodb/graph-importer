@@ -4,6 +4,7 @@ from typing import List, Callable
 class DatabaseInfo:
     def __init__(self, endpoint: str,
                  graph_name: str, vertices_coll_name: str, edge_coll_name: str,
+                 isSmart: bool,
                  replication_factor: int, number_of_shards: int,
                  overwrite: bool,
                  smart_attribute: str, additional_vertex_attribute: str,
@@ -13,6 +14,7 @@ class DatabaseInfo:
         self.number_of_shards = number_of_shards
         self.overwrite = overwrite
         self.smart_attribute = smart_attribute
+        self.isSmart = isSmart
         self.additional_vertex_attribute = additional_vertex_attribute
         self.edge_attribute = edge_attribute
         self.username = username
