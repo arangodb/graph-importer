@@ -1,4 +1,5 @@
-`import random
+import random
+import time
 from typing import Iterable
 
 from tqdm import tqdm
@@ -8,6 +9,8 @@ from databaseinfo import DatabaseInfo, GraphInfo, CliquesGraphInfo
 from general import ConverterToVertex, yes_with_prob, create_graph, insert_documents
 from generator import add_edge, make_and_insert_vertices
 
+connect_parts_time = 0
+insert_edges_time = 0
 
 def create_k_partite_graph(db_info: DatabaseInfo,
                            graph_info: GraphInfo,
@@ -27,6 +30,7 @@ def create_k_partite_graph(db_info: DatabaseInfo,
         :param v_coll:
         :param bulk_size:
         '''
+        s = time.time()
         edges = []
         to_vrtx = ConverterToVertex(v_coll).idx_to_vertex
 
@@ -47,6 +51,8 @@ def create_k_partite_graph(db_info: DatabaseInfo,
                                  pos_in_prop=0,
                                  to_v=to_vrtx)
                         if len(edges) >= bulk_size:
+                            global connect_parts_time
+                            connect_parts_time += time.time() - s
                             yield edges
                             edges.clear()
 
@@ -64,4 +70,7 @@ def create_k_partite_graph(db_info: DatabaseInfo,
     # create edges between cliques
     for edges in connect_parts(c_helper, parts_graph_info.inter_cliques_density,  # get_num_edges_between_cliques,
                                db_info.vertices_coll_name, bulk_size, graph_info.isDirected):
+        s = time.time()
         insert_documents(db_info, edges, db_info.edge_coll_name)
+        global insert_edges_time
+        insert_edges_time += time.time() - s

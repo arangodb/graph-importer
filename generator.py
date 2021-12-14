@@ -7,61 +7,52 @@ from clique_generator import CliquesHelper, create_clique_graph, create_cliques_
 from databaseinfo import DatabaseInfo, GraphInfo, CliquesGraphInfo, VertexOrEdgeProperty
 from general import insert_documents, yes_with_prob, arangodIsRunning, \
     get_time_difference_string
-from k_partite_generator import create_k_partite_graph
+from k_partite_generator import create_k_partite_graph, connect_parts_time, insert_edges_time
 
+insert_vertices_time = 0
+prepare_vertices_time = 0
+add_edge_time = 0
+
+def prepare_vertices(db_info: DatabaseInfo, graph_info: GraphInfo, part_label: str, start: int, end: int):
+
+    # todo change readme
+    s = time.time()
+    for vid in range(start, end):
+        if db_info.isSmart: # smart_attribute exists and makes  sense
+            if db_info.smart_attribute != db_info.additional_vertex_attribute and db_info.smart_attribute != 'part':
+                doc = {f'{db_info.smart_attribute}': vid}
+                if graph_info.vertex_property.type == 'random':
+                    doc[db_info.additional_vertex_attribute] = str(random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
+                if part_label != "":
+                    doc['part'] = part_label
+            elif db_info.smart_attribute == db_info.additional_vertex_attribute: ## type == 'random'
+                doc = {'id': vid}
+                doc[db_info.smart_attribute] = str(random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
+                if part_label != "":
+                    doc['part'] = part_label
+            else: # db_info.smart_attribute == 'part'
+                doc = {'id': vid}
+                doc['part'] = part_label
+                if graph_info.vertex_property.type == 'random':
+                    doc[db_info.additional_vertex_attribute] = str(random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
+        else:
+            doc = {'id': vid}
+            if part_label != "":
+                doc['part'] = part_label
+            if graph_info.vertex_property.type == 'random':
+                doc[db_info.additional_vertex_attribute] = str(
+                    random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
+    global prepare_vertices_time
+    prepare_vertices_time += time.time() - s
 
 def make_vertices(graph_info: GraphInfo,
                   db_info: DatabaseInfo, size: int,
                   bulk_size: int):
     c_begin = graph_info.next_id
     c_end = graph_info.next_id + size
-    if graph_info.vertex_property.type == "none":
-        while graph_info.next_id + bulk_size <= c_end:
-            yield [{f'{db_info.smart_attribute}': vid, 'clique': c_begin} for vid in
-                   range(graph_info.next_id, graph_info.next_id + bulk_size)]
-            graph_info.next_id += bulk_size
-        yield [{f'{db_info.smart_attribute}': vid, 'clique': c_begin} for vid in
-               range(graph_info.next_id, c_end)]
-        graph_info.next_id += c_end
-    elif graph_info.vertex_property.type == "list":
-        if len(graph_info.vertex_property.list) != size:
-            raise RuntimeError(
-                f'make_vertices: the length of vertex_property ({len(graph_info.vertex_property.list)}) '
-                f'must be equal to size ({size}).')
-        while graph_info.next_id + bulk_size <= c_end:
-            yield [{f'{db_info.smart_attribute}': vid,
-                    f'{db_info.additional_vertex_attribute}': graph_info.vertex_property.list[vid],
-                    'clique': c_begin} for vid in
-                   range(graph_info.next_id, graph_info.next_id + bulk_size)]
-            graph_info.next_id += bulk_size
-        yield [{f'{db_info.smart_attribute}': vid,
-                f'{db_info.additional_vertex_attribute}': graph_info.vertex_property.list[vid],
-                'clique': c_begin} for vid in
-               range(graph_info.next_id, c_end)]
-        graph_info.next_id += c_end
-    # random values, kind(vertex_property) == tuple
-    elif graph_info.vertex_property.type == "random":
-        while graph_info.next_id + bulk_size <= c_end:
-            yield [
-                {f'{db_info.smart_attribute}': str(vid),
-                 f'{db_info.additional_vertex_attribute}': str(
-                     random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max))),
-                 'clique': c_begin}
-                for vid in
-                range(graph_info.next_id, graph_info.next_id + bulk_size)]
-            graph_info.next_id += bulk_size
-        yield [
-            {f'{db_info.smart_attribute}': str(vid),
-             f'{db_info.additional_vertex_attribute}': str(
-                 random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
-                , 'clique': c_begin}
-            for vid in
-            range(graph_info.next_id, c_end)]
-        graph_info.next_id += c_end
-    else:
-        raise RuntimeError(
-            f"Wrong vertex property kind: {graph_info.vertex_property.type}. "
-            f"Allowed values are \'none\', \'list\' and \'random\'.")
+    while graph_info.next_id + bulk_size <= c_end:
+        yield prepare_vertices(db_info, graph_info, str(c_begin), graph_info.next_id, graph_info.next_id + bulk_size)
+    yield prepare_vertices(db_info, graph_info, str(c_begin), graph_info.next_id, c_end)
 
 
 # todo make a recordable seed
@@ -78,9 +69,11 @@ def append_edges(edges: List[Dict], isDirected: bool, f: int, t: int, to_v: Call
             doc[attr_name] = attr_value
         edges.append(doc)
 
-def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: DatabaseInfo,  graph_info: GraphInfo,
+
+def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: DatabaseInfo, graph_info: GraphInfo,
              pos_in_prop: int,
              to_v: Callable[[Union[int, str]], str]):
+    s = time.time()
     if yes_with_prob(prob_missing):
         return False
     if graph_info.edge_property.type == 'none':
@@ -95,13 +88,18 @@ def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: Database
         raise RuntimeError(
             f"Wrong vertex property kind: {graph_info.vertex_property.type}. "
             f"Allowed values are \'none\', \'list\' and \'random\'.")  # todo refactor
-
+    global add_edge_time
+    add_edge_time += time.time() - s
 
 def make_and_insert_vertices(db_info: DatabaseInfo,
                              graph_info: GraphInfo, c_helper: CliquesHelper, size: int, bulk_size: int):
     for vertices in make_vertices(graph_info, db_info, size, bulk_size):
+        s_insert_vertices = time.time()
         insert_documents(db_info, vertices, db_info.vertices_coll_name)
+        global insert_vertices_time
+        insert_vertices_time += time.time() - s_insert_vertices
     c_helper.update(size)
+
 
 def get_vertex_property(args) -> VertexOrEdgeProperty:
     if not args.vertex_property_type or args.vertex_property_type == 'none':
@@ -118,8 +116,8 @@ def get_vertex_property(args) -> VertexOrEdgeProperty:
                     'If --vertex_property_type is \'list\' and --graphtype == \'clique\', --vertex_property must have '
                     'exactly --size many arguments.')
         if args.graphtype == 'cliques-graph':
-                raise RuntimeError(
-                    'If --graphtype == \'cliques-graph\', --vertex_property_type == \'list\' is not allowed.')
+            raise RuntimeError(
+                'If --graphtype == \'cliques-graph\', --vertex_property_type == \'list\' is not allowed.')
         v_property = VertexOrEdgeProperty('list', val_list=list(args.vertex_property))
     return v_property
 
@@ -208,41 +206,42 @@ if __name__ == "__main__":
 
     # attributes
     # todo: check allow input file
-    parser.add_argument('--vertex_property_type', nargs='?', choices=['none', 'random', 'list'], default='none',
+    parser.add_argument('--vertex_property_type', nargs='?', choices=['none', 'random'], default='none',
                         help="""Vertex property kind. Default is \'none\', then --vertex_property is ignored and 
                          no properties are saved. If \'random\', --vertex_property should contain two numbers a and b; 
-                         the property value is chosen randomly in [a, b). If \'list\', --vertex_property should
-                         contain a list of values of length exactly the number of vertices 
-                         in the graph.""")
+                         the property value is chosen randomly in [a, b).""")
     parser.add_argument('--vertex_property', nargs='+', help="""Vertex property. This parameter must be given 
                             if and only if --vertex_property_type is not skipped and not \'none\', 
                             otherwise an exception is thrown. If --vertex_property_type is \'random\',
                             two numbers a,b must be given with a <= b, the value for the property will be chosen
-                            randomly with equal probability from the interval [a,b). 
-                            If --vertex_property_type is \'list\', a list of values of length exactly the number
-                            of vertices in the graph must be given.""")
-    parser.add_argument('--edge_property_type', nargs='?', choices=['none', 'random', 'list'], default='none',
+                            randomly with equal probability from the interval [a,b).""")
+    parser.add_argument('--edge_property_type', nargs='?', choices=['none', 'random'], default='none',
                         help="""Edge property kind. Default is \'none\', then --edge_prop is ignored and 
                              the default property 'weight' with values Null is saved. 
                              If \'random\', --edge_prop should contain two numbers a and b; 
-                             the property value is chosen randomly in [a, b). If \'list\', --edge_prop should
-                             contain a list of values of length exactly the number of
-                            vertices in the graph squared must be given (regardless of the actual number of edges).""")
+                             the property value is chosen randomly in [a, b).""")
     parser.add_argument('--edge_prop', nargs='+', help="""Edge property. This parameter must be given 
                           if and only if --edge_property_type is not skipped and not \'none\', 
                           otherwise an exception is thrown. If skipped, the default property 'weight' 
                           with values Null is saved. 
                           If --edge_property_type is \'random\', two numbers a,b must be given with a <= b, 
                           the value for the property will be chosen randomly with equal probability from 
-                          the interval [a,b). 
-                          If --edge_property_type is \'list\', a list of values of length exactly the number 
-                          of vertices in the graph squared must be given (regardless of the actual number of edges).""")
+                          the interval [a,b).""")
     parser.add_argument('--additional_vertex_attribute', default='color',
-                        help="""Additional vertex attribute name used for --vertex_property. Default is \'color\'.""")
+                        help="""Additional vertex attribute name used for --vertex_property. Default is \'color\'.
+                        Cannot be \'part\'.""")
     parser.add_argument('--edge_attribute', default='weight',
                         help="""Edge attribute name used for --edge_prop. Default is \'weight\'.""")
 
     args = parser.parse_args()
+
+    if args.additional_vertex_attribute == 'part':
+        raise RuntimeError('--additional_vertex_attribute cannot be \'part\', choose another name.')
+    if args.vertex_property_type == 'none' and args.smart_attribute == args.additional_vertex_attribute:
+        raise RuntimeError('If --smart_attribute is --args.additional_vertex_attribute, --vertex_property_type '
+                           'cannot be \'none\'.')
+    if args.make_smart and not args.smart_attribute:
+        raise RuntimeError('If --make_smart is given, then also --smart_attribute must be given.')
 
     v_property = get_vertex_property(args)
     edge_property = get_edge_property(args)
@@ -269,4 +268,12 @@ if __name__ == "__main__":
         create_k_partite_graph(database_info, g_info, parts_graph_info, args.bulk_size)
     else:
         pass
-    print('Time: ' + get_time_difference_string(time.time() - start))
+    print('Global time: ' + get_time_difference_string(time.time() - start))
+    print('Time inserting vertices: ' + get_time_difference_string(insert_vertices_time))
+    print('Time preparing vertices: ' + get_time_difference_string(prepare_vertices_time))
+    print('Time adding edges: ' + get_time_difference_string(add_edge_time))
+    print('Time connecting parts: ' + get_time_difference_string(connect_parts_time))
+    print('Time inserting edges: ' + get_time_difference_string(insert_edges_time))
+
+
+
