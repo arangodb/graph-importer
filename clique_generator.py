@@ -119,7 +119,7 @@ def create_clique_graph(db_info: DatabaseInfo,
                         graph_info: GraphInfo):
     create_graph(db_info)
     c_helper = CliquesHelper()
-    make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size)
+    make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size, add_part=False)
     make_and_insert_clique_edges(db_info, graph_info, c_helper,
                                  clique_idx=0, size=size, bulk_size=bulk_size, prob_missing=0.0)
 
@@ -182,7 +182,7 @@ def create_cliques_graph(db_info: DatabaseInfo,
     for clique_i in tqdm(range(c_graph_info.num_cliques), desc='Constructing cliques', mininterval=1.0,
                          unit='clique'):
         size = random.randint(c_graph_info.min_size_clique, c_graph_info.max_size_clique)
-        make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size)
+        make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size, add_part=True)
         make_and_insert_clique_edges(db_info, graph_info, c_helper, clique_i, size, bulk_size,
                                      c_graph_info.prob_missing)
 

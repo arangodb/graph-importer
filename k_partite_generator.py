@@ -65,7 +65,7 @@ def create_k_partite_graph(db_info: DatabaseInfo,
     for _ in tqdm(range(parts_graph_info.num_cliques), desc='Constructing cliques', mininterval=1.0,
                   unit='clique'):
         size = random.randint(parts_graph_info.min_size_clique, parts_graph_info.max_size_clique)
-        make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size)
+        make_and_insert_vertices(db_info, graph_info, c_helper, size, bulk_size, add_part=True)
 
     # create edges between cliques
     for edges in connect_parts(c_helper, parts_graph_info.inter_cliques_density,  # get_num_edges_between_cliques,

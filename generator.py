@@ -47,12 +47,17 @@ def prepare_vertices(db_info: DatabaseInfo, graph_info: GraphInfo, part_label: s
 
 def make_vertices(graph_info: GraphInfo,
                   db_info: DatabaseInfo, size: int,
-                  bulk_size: int):
+                  bulk_size: int,
+                  add_part: bool = True):
     c_begin = graph_info.next_id
     c_end = graph_info.next_id + size
+    if add_part:
+        part_value = str(c_begin)
+    else:
+        part_value = "" # don't add
     while graph_info.next_id + bulk_size <= c_end:
-        yield prepare_vertices(db_info, graph_info, str(c_begin), graph_info.next_id, graph_info.next_id + bulk_size)
-    yield prepare_vertices(db_info, graph_info, str(c_begin), graph_info.next_id, c_end)
+        yield prepare_vertices(db_info, graph_info, part_value, graph_info.next_id, graph_info.next_id + bulk_size)
+    yield prepare_vertices(db_info, graph_info, part_value, graph_info.next_id, c_end)
 
 
 # todo make a recordable seed
@@ -91,9 +96,10 @@ def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: Database
     global add_edge_time
     add_edge_time += time.time() - s
 
-def make_and_insert_vertices(db_info: DatabaseInfo,
-                             graph_info: GraphInfo, c_helper: CliquesHelper, size: int, bulk_size: int):
-    for vertices in make_vertices(graph_info, db_info, size, bulk_size):
+
+def make_and_insert_vertices(db_info: DatabaseInfo, graph_info: GraphInfo,
+                             c_helper: CliquesHelper, size: int, bulk_size: int, add_part: bool = True):
+    for vertices in make_vertices(graph_info, db_info, size, bulk_size, add_part):
         s_insert_vertices = time.time()
         insert_documents(db_info, vertices, db_info.vertices_coll_name)
         global insert_vertices_time
@@ -237,6 +243,8 @@ if __name__ == "__main__":
 
     if args.additional_vertex_attribute == 'part':
         raise RuntimeError('--additional_vertex_attribute cannot be \'part\', choose another name.')
+    if args.additional_vertex_attribute == 'id':
+        raise RuntimeError('--additional_vertex_attribute cannot be \'id\', choose another name.')
     if args.vertex_property_type == 'none' and args.smart_attribute == args.additional_vertex_attribute:
         raise RuntimeError('If --smart_attribute is --args.additional_vertex_attribute, --vertex_property_type '
                            'cannot be \'none\'.')
