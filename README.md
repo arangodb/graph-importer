@@ -4,6 +4,44 @@ This repository contains command line Python scripts to import graphs from exter
 instance of `arangod`
 and to generate graphs in a running instance.
 
+For the impatient user:
+  - importing a Graphalytics graph:
+```commandline
+python importer.py http://localhost:8529/_db/_system graphalytics --dir_graphalytics /PATH/GRAPH_DIRECTORY 
+```
+  - importing a graph saved as a list of edges:
+```commandline
+python importer.py http://localhost:8529/_db/_system edge-list --edges_file_edge_list /PATH/GRAPH_FILE 
+```
+  - generate a clique (only one direction for every undirected edge):
+```commandline
+python generator.py http://localhost:8529/_db/_system clique \
+    --num_vertices 1000 --graphname Clique --edges cliqueEdges --vertices cliqueVertices \
+    --overwrite --vertex_property_type random 
+    --vertex_property 0.1 0.9 --edge_property_type random --edge_prop 0.2 0.8
+```
+This will create a clique graph on 1000 vertices in the database. The vertex collection
+will be `cliqueVertices`, the edge collection `cliqueEdges`, the graph itself `Clique`.
+Any existing object with the same name will be overwritten. The vertices will have
+a random number between 0.1 and 0.9 as an attribute, the edges - between 0.2 and 0.8.
+
+  - Generating a "cliques-graph": a dijoint union of 100 cliques such that
+    - in a clique, an edge is missing with probability 0.4;
+    - any two cliques are connected with probability 0.7;
+    - an edge between two connected cliques exists with probability 0.3:
+```commandline
+python generator.py http://localhost:8529/_db/_system cliques-graph 
+    --num_cliques 100 --min_size_clique 12 --max_size_clique 12 
+    --prob_missing 0.4 --inter_cliques_density 0.7 --density_between_two_cliques 0.3
+```
+  - Generating the 20-partite complete graph with parts of random size between 30 and 35. The 
+constructed graph will be smart with smart attribute `part`
+
+```commandline
+python generator.py http://localhost:8529/_db/_system k-partite 
+    --num_parts 20 --min_size_clique 30 --max_size_clique 35 
+    --make_smart --smart_attribute part --overwrite
+```
 # Importing Graphs
 
 The graphs be stored in a local file. Two formats are accepted: graphs from the

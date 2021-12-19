@@ -2,12 +2,12 @@
 import argparse
 import time
 
-from databaseinfo import DatabaseInfo, GraphInfo, VertexOrEdgeProperty
+from helper_classes import DatabaseInfo, GraphInfo, VertexOrEdgeProperty
 from edge_list import import_edge_list
 from general import get_time_difference_string
 from graphalytics_importer import import_graphalytics_get_files, import_graphalytics
 
-if __name__ == "__main__":
+def get_arguments():
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
     parser.add_argument('endpoint', type=str, help='Endpoint, e.g. http://localhost:8529/_db/_system')
@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument('--dir_graphalytics', '-d', type=str, nargs='?',
                         help='For Graphalytics graphs, the directory containing the files. '
                              'If given, overwrites possible arguments --vgf, --egf and --pgf.')
-    parser.add_argument('--vertices_file_graphalytics', '-v', type=str, nargs='?',
+    parser.add_argument('--vertices_file_graphalytics', type=str, nargs='?',
                         help='For Graphalytics graphs, the file containing the vertices.')
     parser.add_argument('--edges_file_graphalytics', type=str, nargs='?',
                         help='For Graphalytics graphs, the file containing the edges.')
@@ -43,20 +43,29 @@ if __name__ == "__main__":
                         help='Overwrite the graph and the collection if they already exist.')
     parser.add_argument('--make_smart', action='store_false',  # default: true
                         help='Create a smart graph.')
+    parser.add_argument('--silent', action='store_true',  # default: False
+                        help='Print progress and statistics.')
 
-    args = parser.parse_args()
-
+    arguments = parser.parse_args()
+    
     # check arguments
-    if args.sourcetype == 'graphalytics':
-        if not args.dir_graphalytics and not (
-                args.vertices_file_graphalytics and args.edges_file_graphalytics and args.properties_file_graphalytics):
+    if arguments.sourcetype == 'graphalytics':
+        if not arguments.dir_graphalytics and not (
+                arguments.vertices_file_graphalytics and arguments.edges_file_graphalytics and arguments.properties_file_graphalytics):
             raise Exception(
                 'With sourcetype graphalytics, either --dir_graphalytics, or all of --vertices_file_graphalytics, '
                 '--edges_file_graphalytics and --properties_file_graphalytics must be given.')
-    if args.sourcetype == 'edge-list':
-        if not args.edges_file_edge_list:
+    if arguments.sourcetype == 'edge-list':
+        if not arguments.edges_file_edge_list:
             raise Exception(
                 'With sourcetype edge-list, edges_file_edge_list must be given.')
+
+    return arguments
+
+
+if __name__ == "__main__":
+
+    args = get_arguments()
 
     db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.make_smart,
                            args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
@@ -64,9 +73,8 @@ if __name__ == "__main__":
 
     vertex_property = VertexOrEdgeProperty('none')
     edge_property = VertexOrEdgeProperty('none')
-    graph_info = GraphInfo(hasSelfLoops=False, isDirected=not args.enforce_undirected, vertex_property=vertex_property,
-                           edge_property=edge_property)
-    # for graphalytics, get file names from parameters
+    graph_info = GraphInfo(hasSelfLoops=False, vertex_property=vertex_property, edge_property=edge_property)
+
     if args.sourcetype == 'graphalytics':
         if args.dir_graphalytics:
             vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(
@@ -76,12 +84,15 @@ if __name__ == "__main__":
             edges_filename = args.edges_file_graphalytics
             properties_filename = args.properties_file_graphalytics
 
-        start = time.time()
-        import_graphalytics(db_info, graph_info, vertices_filename, edges_filename, properties_filename, args.bulk_size)
-        print('Time: ' + get_time_difference_string(time.time() - start))
+        start = time.monotonic()
+        import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
+                            not args.silent)
+        if not args.silent:
+            print('Total time: ' + get_time_difference_string(time.monotonic() - start))
         exit(0)
     if args.sourcetype == 'edge-list':
-        start = time.time()
-        import_edge_list(db_info, graph_info, args.edges_file_edge_list, args.bulk_size)
-        print('Time: ' + get_time_difference_string(time.time() - start))
+        start = time.monotonic()
+        import_edge_list(db_info, args.edges_file_edge_list, args.bulk_size, not args.silent)
+        if not args.silent:
+            print('Total time: ' + get_time_difference_string(time.monotonic() - start))
         exit(0)
