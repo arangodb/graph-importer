@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse
 import time
 
@@ -22,6 +22,8 @@ def get_arguments():
                         help='For Graphalytics graphs, the file containing the vertices.')
     parser.add_argument('--edges_file_graphalytics', type=str, nargs='?',
                         help='For Graphalytics graphs, the file containing the edges.')
+    parser.add_argument('--properties_file_graphalytics', type=str, nargs='?',
+                        help='For Graphalytics graphs, the file containing the properties of the graph.')
     parser.add_argument('--edges_file_edge_list', default='graph.txt', type=str, nargs='?',
                         help='For graphs given by an edge list, the file containing the edges.')
     parser.add_argument('--bulk_size', type=int, nargs='?', default=10000,
@@ -49,7 +51,7 @@ def get_arguments():
 
     # check arguments
     if arguments.sourcetype == 'graphalytics' and not arguments.dir_graphalytics and not (
-            arguments.vertices_file_graphalytics and arguments.edges_file_graphalytics):
+            arguments.vertices_file_graphalytics and arguments.edges_file_graphalytics and arguments.properties_file_graphalytics):
         raise Exception(
             'With sourcetype graphalytics, either --dir_graphalytics, or all of --vertices_file_graphalytics, '
             '--edges_file_graphalytics and --properties_file_graphalytics must be given.')
@@ -75,13 +77,14 @@ if __name__ == "__main__":
 
     if args.sourcetype == 'graphalytics':
         if args.dir_graphalytics:
-            vertices_filename, edges_filename = import_graphalytics_get_files(args.dir_graphalytics)
+            vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(args.dir_graphalytics)
         else:
             vertices_filename = args.vertices_file_graphalytics
             edges_filename = args.edges_file_graphalytics
+            properties_filename = args.properties_file_graphalytics
 
         start = time.monotonic()
-        import_graphalytics(db_info, vertices_filename, edges_filename, args.bulk_size,
+        import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
                             not args.silent)
         if not args.silent:
             print('Total time: ' + get_time_difference_string(time.monotonic() - start))

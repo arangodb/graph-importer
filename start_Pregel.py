@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
 import argparse
-import os
-from typing import List, Optional
 import json
+import os
+from time import sleep
+from typing import List, Optional
+
 import requests
 
 from helper_classes import DatabaseInfo
@@ -16,6 +19,8 @@ def get_arguments():
                         help='The number of vertices/edges written in one go.')
     parser.add_argument('--silent', action='store_true',  # default: False
                         help='Print progress and statistics.')
+    parser.add_argument('--sleep_time', type=int, default=1000, help='Time in milliseconds to wait before requesting '
+                                                                     'the status of the Pregel program again.')
 
     # database
     parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
@@ -117,11 +122,46 @@ def get_pregel_exec_status(db_info: DatabaseInfo, algorithm_id: str):
     response = requests.get(url, auth=(db_info.username, db_info.password))
 
     if response.status_code != 200:
-            raise RuntimeError(f'Error retrieving the execution status of the algorithm with id: {algorithm_id}. Error '
+        raise RuntimeError(f'Error retrieving the execution status of the algorithm with id: {algorithm_id}. Error '
                            f'code: {response.status_code}. Error message: {response.text}. Reason: no Pregel job with '
                            f'the specified execution number is found or the execution number is invalid.')
 
     return response
+
+
+def get_width(key: str) -> int:
+    if key == 'state':
+        return 25
+    elif key == 'aggregators':
+        return 35
+    elif key == 'computationTime':
+        return 20
+    else:
+        return 15
+
+
+def print_pregel_status_variable(d: json) -> None:
+    information = ''
+    for key, value in d.items():
+        if key in [
+            # these values are always the same:
+            'id', 'database', 'algorithm', 'created', 'ttl',
+            # these values seem to appear only when 'state' == 'done'
+            'expires', 'storageTime', 'vertexCount', 'edgeCount']:
+            continue
+        if type(value) == float:
+            val = f'{value:.5f}'
+        elif type(value) == dict and value:
+            for vkey, vval in value.items():
+                if type(vval) == float:
+                    value[vkey] = f'{vval:.8f}'
+            val = str(value)
+        else:
+            val = str(value)
+
+        information += f'{val:<{get_width(key)}}'
+
+    print(f'{information:15}')
 
 
 if __name__ == "__main__":
@@ -158,13 +198,36 @@ if __name__ == "__main__":
         algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edgeCollections, args.vertexCollections,
                                              params).strip('"')
         status = get_pregel_exec_status(db_info, algorithm_id)
-        json_doc = json.loads(status.text.strip('"'))
-        while json_doc.state == 'running' or json_doc.state == 'storing' :
-            print(status.text)
+        if status.status_code == 200:
+            d = json.loads(status.text.strip('"'))
+            print(f'id: {d["id"]}')
+            print(f'database: {d["database"]}')
+            print(f'algorithm: {d["algorithm"]}')
+            print(f'created: {d["created"]}')
+            print(f'ttl: {d["ttl"]}')
+            print()
+            # print column names
+            first_line = ''
+            for key, value in d.items():
+                if key in ['id', 'database', 'algorithm', 'created', 'ttl']:
+                    continue
+                first_line += f'{key:<{get_width(key)}}'
+            print(first_line + '\n')
+        else:
+            raise RuntimeError(f'Pregel returned error. Error code: {status.status_code}. Message: {status.text}')
+
+        while d['state'] == 'running' or d['state'] == 'storing' or d['state'] == 'recovering':
+            sleep(args.sleep_time)
+            print_pregel_status_variable(d)
             status = get_pregel_exec_status(db_info, algorithm_id)
-            json_doc = json.loads(status.text.strip('"'))
-        status = get_pregel_exec_status(db_info, algorithm_id)
-        json_doc = json.loads(status.text.strip('"'))
+            d = json.loads(status.text.strip('"'))
+        print_pregel_status_variable(d)
+        print()
+        for key, value in d.items():
+            if key in ['expires', 'storageTime', 'vertexCount', 'edgeCount']:
+                print(f'{key}: {value}')
+
+        exit(0)
     # sssp
     if args.cmd == 'sssp':
         if args.source:

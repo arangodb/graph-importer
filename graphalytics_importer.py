@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 from pathlib import PurePath
 
@@ -20,7 +19,8 @@ def import_graphalytics_get_files(directory: str):
     :return: the three filenames
     """
     graph_name = PurePath(directory).name
-    return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e')
+    return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e'), os.path.join(
+        directory, graph_name + '.properties')
 
 
 def get_property_graphalytics(properties_filename: str, property_: str):
@@ -75,26 +75,23 @@ def read_and_create_vertices_graphalytics(vertices_filename, properties_filename
     :param bulk_size: the bulk num_vertices
     :return: None
     """
-    count = 0
-    num_vertices = get_property_graphalytics(properties_filename, 'num_vertices')
-    if be_verbose:
-        print(f'Number of vertices: {num_vertices}')
     start_v = time.monotonic()
+
     if be_verbose:
+        num_vertices = get_property_graphalytics(properties_filename, 'num_vertices')
+        print(f'Number of vertices: {num_vertices}')
         with tqdm(total=num_vertices, desc='Importing vertices',
                   mininterval=1.0,
                   unit='vertices', ncols=100) as pbar:
             for vids in file_reader(vertices_filename, bulk_size):
                 vertices = [{f'{db_info.smart_attribute}': str(vid), '_key': str(vid) + ':' + str(vid)} for vid in vids]
                 insert_documents(db_info, vertices, db_info.vertices_coll_name)
-                count += len(vertices)
                 pbar.update(len(vids))
         print('Time for vertices: ' + get_time_difference_string(time.monotonic() - start_v))
     else:
         for vids in file_reader(vertices_filename, bulk_size):
             vertices = [{f'{db_info.smart_attribute}': str(vid), '_key': str(vid) + ':' + str(vid)} for vid in vids]
             insert_documents(db_info, vertices, db_info.vertices_coll_name)
-            count += len(vertices)
 
 
 def read_and_create_edges_graphalytics(edges_filename, properties_filename, db_info: DatabaseInfo, bulk_size,
@@ -111,6 +108,7 @@ def read_and_create_edges_graphalytics(edges_filename, properties_filename, db_i
     :param bulk_size:
     :return:
     """
+
     def make_edges(eids_):
         edges_ = list()
         for i in eids_:

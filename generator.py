@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import time
 import cProfile
@@ -126,7 +128,7 @@ if __name__ == "__main__":
         v_property = get_vertex_property(args)
         edge_property = get_edge_property(args)
 
-        database_info = DatabaseInfo(args.endpoint, args.graphname, args.certex_collection_name,
+        database_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
                                      args.edge_collection_name,
                                      args.make_smart,
                                      args.repl_factor,
