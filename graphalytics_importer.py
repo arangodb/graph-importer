@@ -20,8 +20,7 @@ def import_graphalytics_get_files(directory: str):
     :return: the three filenames
     """
     graph_name = PurePath(directory).name
-    return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e'), os.path.join(
-        directory, graph_name + '.properties')
+    return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e')
 
 
 def get_property_graphalytics(properties_filename: str, property_: str):

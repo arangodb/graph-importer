@@ -78,7 +78,7 @@ def insert_documents(db_info: DatabaseInfo, documents, collection_name: str):
     url = os.path.join(db_info.endpoint, "_api/document/", collection_name)
     response = requests.post(url, json=documents, auth=(db_info.username, db_info.password))
     if response.status_code != 202:
-        raise RuntimeError(f"Invalid response from bulk insert{response.text}")
+        raise RuntimeError(f"Invalid response from bulk insert: {response.text}")
 
 
 def file_reader(filename, bulk_size):

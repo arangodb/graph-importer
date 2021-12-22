@@ -1,15 +1,20 @@
-from typing import List
+from typing import List, Optional
 
 
 class DatabaseInfo:
     def __init__(self, endpoint: str,
-                 graph_name: str, vertices_coll_name: str, edge_coll_name: str,
-                 isSmart: bool,
-                 replication_factor: int, number_of_shards: int,
-                 overwrite: bool,
-                 smart_attribute: str, additional_vertex_attribute: str,
-                 edge_attribute: str,
-                 username: str, password: str):
+                 graph_name: str,
+                 vertices_coll_name: Optional[str] = None,
+                 edge_coll_name: Optional[str] = None,
+                 isSmart: bool = False,
+                 replication_factor: Optional[int] = None,
+                 number_of_shards: Optional[int] = None,
+                 overwrite: Optional[bool] = None,
+                 smart_attribute: Optional[str] = None,
+                 additional_vertex_attribute: Optional[str] = None,
+                 edge_attribute: Optional[str] = None,
+                 username: str = 'root', password: str = ''
+                 ):
         self.replication_factor = replication_factor
         self.number_of_shards = number_of_shards
         self.overwrite = overwrite
@@ -38,26 +43,27 @@ class CliquesGraphInfo:
 
     def __init__(self,
                  num_cliques: int, min_size_clique: int, max_size_clique: int,
-                 prob_missing: float, inter_cliques_density: float, density_between_two_cliques: float):
+                 prob_missing_one: float, prob_missing_all: float, prob_missing_one_between: float
+                ):
         """
         Information for cliques-graph construction. The graph is the result of the following construction.
-        Make a graph with num_cliques many vertices, add edges with probability inter_cliques_density.
+        Make a graph with num_cliques many vertices, add edges with probability pron_missing_all.
         Then replace every vertex v by a set V_v of vertices of num_vertices randomly chosen between min_size_clique and
         max_size_clique with equal probability. Remove edges vw and insert every edge between V_v and V_w with
         probability density_between_two_cliques.
         :param num_cliques: number of cliques
         :param min_size_clique:
         :param max_size_clique:
-        :param prob_missing:
-        :param inter_cliques_density:
+        :param prob_missing_one:
+        :param prob_missing_all:
         :param density_between_two_cliques:
         """
-        self.density_between_two_cliques = density_between_two_cliques
+        self.prob_missing_one_between = prob_missing_one_between
         self.num_cliques = num_cliques
         self.min_size_clique = min_size_clique
         self.max_size_clique = max_size_clique
-        self.prob_missing = prob_missing
-        self.inter_cliques_density = inter_cliques_density
+        self.prob_missing_one = prob_missing_one
+        self.prob_missing_all = prob_missing_all
 
 
 class GraphInfo:

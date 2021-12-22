@@ -36,15 +36,15 @@ def get_arguments():
                         help='Minimum clique num_vertices in a cliques-graph. Ignored for other graphs.')
     parser.add_argument('--max_size_clique', type=int,
                         help='Maximum clique num_vertices in a cliques-graph. Ignored for other graphs.')
-    parser.add_argument('--prob_missing', type=float,
+    parser.add_argument('--prob_missing_one', type=float,
                         help='The probability for an edge in a clique to be missing  in a cliques-graph. '
                              'Ignored for other graphs.')
-    parser.add_argument('--inter_cliques_density', type=float,
+    parser.add_argument('--prob_missing_all', type=float,
                         help='The probability that there are edges between two cliques in a cliques-graph. '
                              'Ignored for other graphs.')
-    parser.add_argument('--density_between_two_cliques', type=float, default=[0.5],
-                        help='The density of edges between two cliques, i.e., if the cliques have sizes s1 and s2, '
-                             'and there are m edges between the two cliques, the density is m/(s1*s2).')
+    parser.add_argument('--prob_missing_one_between', type=float, default=0.5,
+                        help='The probability for an edge between two parts to be missing in a cliques-graph or in '
+                             'a k-partite graph.')
 
     # k-partite parameters
     parser.add_argument('--num_parts', '-k', type=int,
@@ -58,15 +58,16 @@ def get_arguments():
     parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
     parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
     parser.add_argument('--graphname', default='generatedGraph', help='Name of the new graph in the database.')
-    parser.add_argument('--edges', default='e', help='Name of the new edge relation in the database.')
-    parser.add_argument('--vertices', default='v', help='Name of the new vertex relation in the database.')
+    parser.add_argument('--edge_collection_name', default='e', help='Name of the new edge collection in the database.')
+    parser.add_argument('--vertex_collection_name', default='v', help='Name of the new vertex collection'
+                                                                      ' in the database.')
     parser.add_argument('--num_shards', default=5, type=int, help='Number of shards.')
     parser.add_argument('--repl_factor', default=2, type=int, help='Replication factor.')
     parser.add_argument('--smart_attribute', default='smartProp',
                         help='The name of the attribute to shard the vertices after.')
     parser.add_argument('--overwrite', action='store_true',  # default: false
                         help='Overwrite the graph and the collection if they already exist.')
-    parser.add_argument('--make_smart', action='store_false',  # default: true
+    parser.add_argument('--make_smart', action='store_true',  # default: false
                         help='Create a smart graph.')
 
     # attributes
@@ -81,11 +82,11 @@ def get_arguments():
                             two numbers a,b must be given with a <= b, the value for the property_ will be chosen
                             randomly with equal probability from the interval [a,b).""")
     parser.add_argument('--edge_property_type', nargs='?', choices=['none', 'random'], default='none',
-                        help="""Edge property_ kind. Default is \'none\', then --edge_prop is ignored and 
+                        help="""Edge property_ kind. Default is \'none\', then --edge_property is ignored and 
                              the default property_ 'weight' with values Null is saved. 
-                             If \'random\', --edge_prop should contain two numbers a and b; 
+                             If \'random\', --edge_property should contain two numbers a and b; 
                              the property_ value is chosen randomly in [a, b).""")
-    parser.add_argument('--edge_prop', nargs='+', help="""Edge property_. This parameter must be given 
+    parser.add_argument('--edge_property', nargs='+', help="""Edge property_. This parameter must be given 
                           if and only if --edge_property_type is not skipped and not \'none\', 
                           otherwise an exception is thrown. If skipped, the default property_ 'weight' 
                           with values Null is saved. 
@@ -96,7 +97,7 @@ def get_arguments():
                         help="""Additional vertex attribute name used for --vertex_property. Default is \'color\'.
                         Cannot be \'part\'.""")
     parser.add_argument('--edge_attribute', default='weight',
-                        help="""Edge attribute name used for --edge_prop. Default is \'weight\'.""")
+                        help="""Edge attribute name used for --edge_property. Default is \'weight\'.""")
 
     arguments = parser.parse_args()
 
@@ -125,7 +126,9 @@ if __name__ == "__main__":
         v_property = get_vertex_property(args)
         edge_property = get_edge_property(args)
 
-        database_info = DatabaseInfo(args.endpoint, args.graphname, args.vertices, args.edges, args.make_smart,
+        database_info = DatabaseInfo(args.endpoint, args.graphname, args.certex_collection_name,
+                                     args.edge_collection_name,
+                                     args.make_smart,
                                      args.repl_factor,
                                      args.num_shards, args.overwrite, args.smart_attribute,
                                      args.additional_vertex_attribute,
@@ -138,13 +141,14 @@ if __name__ == "__main__":
         start = time.monotonic()
         if args.graphtype == 'cliques-graph':
             clique_graph_info = CliquesGraphInfo(args.num_cliques, args.min_size_clique, args.max_size_clique,
-                                                 args.prob_missing, args.inter_cliques_density,
-                                                 args.density_between_two_cliques)
-            create_cliques_graph(database_info, g_info, clique_graph_info, args.bulk_size, time_tracking)
+                                                 args.prob_missing_one, args.prob_missing_all,
+                                                 args.prob_missing_one_between
+                                                 )
+            create_cliques_graph(database_info, g_info, clique_graph_info, args.bulk_size, time_tracking, not args.silent)
         elif args.graphtype == 'clique':
             create_one_clique_graph(database_info, args.bulk_size, args.num_vertices, g_info, time_tracking)
         elif args.graphtype == 'k-partite':
-            parts_graph_info = CliquesGraphInfo(args.num_parts, args.min_size_clique, args.max_size_clique, 0.0, 0.0, 0.0)
+            parts_graph_info = CliquesGraphInfo(args.num_parts, args.min_size_clique, args.max_size_clique, 0.0, 0.0)
             create_k_partite_graph(database_info, g_info, parts_graph_info, args.bulk_size, time_tracking)
         else:
             pass

@@ -1,7 +1,7 @@
 import os
 import random
 import time
-from typing import Union
+from typing import Union, Optional
 import requests
 import tqdm
 
@@ -26,25 +26,17 @@ def prepare_vertices(db_info: DatabaseInfo, graph_info: GraphInfo, part_label: s
     docs = []
     for vid in range(start_idx, end_idx):
         if db_info.isSmart:  # smart_attribute exists and makes sense
-            if db_info.smart_attribute != db_info.additional_vertex_attribute and db_info.smart_attribute != 'part':
-                doc = {f'{db_info.smart_attribute}': str(vid)}
-                if graph_info.vertex_property.type == 'random':
-                    doc[db_info.additional_vertex_attribute] = str(
-                        random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
-                if part_label != "":
-                    doc['part'] = part_label
-            elif db_info.smart_attribute == db_info.additional_vertex_attribute:  # type == 'random'
-                doc = {'id': str(vid), db_info.smart_attribute: str(
-                    random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))}
+            if db_info.smart_attribute != 'part':
+                doc = {f'{db_info.smart_attribute}': str(vid), "_key": f'{vid}:{vid}'}
                 if part_label != "":
                     doc['part'] = part_label
             else:  # db_info.smart_attribute == 'part'
-                doc = {'id': str(vid), 'part': part_label}
-                if graph_info.vertex_property.type == 'random':
-                    doc[db_info.additional_vertex_attribute] = str(
-                        random.uniform(float(graph_info.vertex_property.min), float(graph_info.vertex_property.max)))
+                doc = {'_key': f'{part_label}:{vid}', 'part': f'{part_label}'}
+            if graph_info.vertex_property.type == 'random':
+                doc[db_info.additional_vertex_attribute] = str( random.uniform(float(graph_info.vertex_property.min),
+                                                                               float(graph_info.vertex_property.max)))
         else:
-            doc = {'id': str(vid)}
+            doc = {'_key': str(vid)}
             if part_label != "":
                 doc['part'] = part_label
             if graph_info.vertex_property.type == 'random':
@@ -92,17 +84,18 @@ def make_and_insert_vertices(db_info: DatabaseInfo, graph_info: GraphInfo, size:
                              be_verbose: bool = True):
     start_time = time.monotonic()
 
-    with tqdm.tqdm(total=size,
-                   desc='Creating vertices',
-                   mininterval=1.0,
-                   unit='vertices', ncols=100) as pbar:
-        for vertices in make_vertices(graph_info, db_info, size, bulk_size, time_tracker, add_part):
-            s_insert_vertices = time.monotonic()
-            insert_documents(db_info, vertices, db_info.vertices_coll_name)
-            time_tracker.insert_vertices_time += time.monotonic() - s_insert_vertices
+    if be_verbose:
+        pbar = tqdm.tqdm(total=size, desc='Creating vertices', mininterval=1.0,  unit='vertices', ncols=100)
+    for vertices in make_vertices(graph_info, db_info, size, bulk_size, time_tracker, add_part):
+        s_insert_vertices = time.monotonic()
+        insert_documents(db_info, vertices, db_info.vertices_coll_name)
+        time_tracker.insert_vertices_time += time.monotonic() - s_insert_vertices
+        if be_verbose:
             pbar.update(len(vertices))
         if c_helper:
             c_helper.update(size)
+    if be_verbose:
+        pbar.close()
     time_tracker.make_and_insert_vertices_time += time.monotonic() - start_time
 
 
@@ -157,5 +150,8 @@ class ConverterToVertex:
     def __init__(self, vertex_coll_name: str):
         self.vertex_coll_name = vertex_coll_name
 
-    def idx_to_vertex(self, idx: Union[int, str]) -> str:
-        return str(f"{self.vertex_coll_name}/{idx}:{idx}")
+    def idx_to_smart_vertex(self, idx: Union[int, str], smart_value: str) -> str:
+        return f"{self.vertex_coll_name}/{smart_value}:{idx}"
+
+    def idx_to_vertex(self, idx: Union[int, str]):
+        return f"{self.vertex_coll_name}/{idx}"
