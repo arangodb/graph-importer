@@ -6,10 +6,12 @@ and to generate graphs in a running instance.
 
 # TL;DR:
 
-- importing a Graphalytics graph:
+- importing a [Graphalytics](https://graphalytics.org/) graph:
 
 ```commandline
-python importer.py http://localhost:8529/_db/_system graphalytics --dir_graphalytics /PATH/GRAPH_DIRECTORY 
+wget https://atlarge.ewi.tudelft.nl/graphalytics/zip/wiki-Talk.zip
+unzip wiki-Talk.zip
+python importer.py http://localhost:8529/_db/_system graphalytics --dir_graphalytics wiki-Talk
 ```
 
 - importing a graph saved as a list of edges:
@@ -29,12 +31,12 @@ python generator.py http://localhost:8529/_db/_system clique \
 
 This will create a clique graph on 1000 vertices in the database. The vertex collection will be `cliqueVertices`, the
 edge collection `cliqueEdges`, the graph itself `Clique`. Any existing object with the same name will be overwritten.
-The vertices will have a random number between 0.1 and 0.9 as an attribute, the edges - between 0.2 and 0.8.
+The vertices will have a random number between `0.1` and `0.9` as an attribute, the edges - between `0.2` and `0.8`.
 
-- Generating a "cliques-graph": a dijoint union of 100 cliques such that
-    - in a clique, an edge is missing with probability 0.4;
-    - any two cliques are connected with probability 0.7;
-    - an edge between two connected cliques exists with probability 0.3:
+- Generating a "cliques-graph": a disjoint union of 100 cliques such that
+    - in a clique, an edge is missing with probability `0.4`;
+    - any two cliques are connected with probability `0.7`;
+    - an edge between two connected cliques exists with probability `0.3`.
 
 ```commandline
 python generator.py http://localhost:8529/_db/_system cliques-graph 
