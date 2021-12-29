@@ -271,15 +271,6 @@ def create_one_clique_graph(db_info: DatabaseInfo,
                                  be_verbose=be_verbose)
 
 
-def connect_parts(c_helper: CliquesHelper, bulk_size: int, prob_missing_all: float,
-                  prob_missing_one_between: float, db_info: DatabaseInfo, graph_info: GraphInfo,
-                  start_i_idx: int, end_i_idx: int, be_verbose: bool, num_cores: int):
-    for edges in make_edges_connect_parts(c_helper, bulk_size, prob_missing_all,
-                                          prob_missing_one_between,
-                                          db_info, graph_info, start_i_idx, end_i_idx, be_verbose):
-        insert_documents(db_info, edges, db_info.edge_coll_name)
-
-
 def create_cliques_graph(db_info: DatabaseInfo,
                          graph_info: GraphInfo,
                          c_graph_info: CliquesGraphInfo,
@@ -309,32 +300,6 @@ def create_cliques_graph(db_info: DatabaseInfo,
                                      c_helper=c_helper, clique_idx=clique_i, be_verbose=be_verbose)
 
     # create edges_ between cliques
-    n = c_helper.num_cliques()
-    num_edges = int(n * (n - 1) / 2)
-    num_cores = multiprocessing.cpu_count()
-
-    if num_cores * 100 < num_edges:
-        # parallelise
-        jobs = []
-
-        piece_size = num_edges // num_cores
-        start_i_idx = 0
-        for i in range(num_cores):
-            end_i_idx = start_i_idx + int(((2 * n - 1) -
-                                           math.sqrt((2 * n - 1) * (2 * n - 1) - 4 * (
-                                                   2 - 2 * n + 2 * piece_size))) // 2)  # school math
-            end_i_idx = min(n, end_i_idx + 1)  # shift back
-            if i == num_cores - 1:
-                end_i_idx = n
-            process = multiprocessing.Process(target=connect_parts,
-                                              args=(c_helper, bulk_size, c_graph_info.prob_missing_all,
-                                                    c_graph_info.prob_missing_one_between,
-                                                    db_info, graph_info, start_i_idx, end_i_idx, be_verbose, i,
-                                                    num_cores))
-            process.start()
-            jobs.append(process)
-            # now update the interval whose first part is away to the previous process
-            n -= end_i_idx - start_i_idx
-            start_i_idx = end_i_idx
-
-    # the logic is as in make_edges_generalized_clique_piece
+    for edges in make_edges_connect_parts(c_helper, bulk_size, c_graph_info.prob_missing_all,
+                                          c_graph_info.prob_missing_one_between, db_info, graph_info, be_verbose):
+        insert_documents(db_info, edges, db_info.edge_coll_name)
