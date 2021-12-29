@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import cProfile
 import time
 
 from arguments import make_database_parameters, make_general_graph_parameters_generator, make_cliques_graph_parameters
@@ -43,7 +42,6 @@ def get_arguments():
 if __name__ == "__main__":
     if not arangodIsRunning():
         raise RuntimeError('The process \'arangod\' is not running, please, run it first.')
-
 
     args = get_arguments()
 

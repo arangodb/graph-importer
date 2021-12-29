@@ -33,7 +33,7 @@ def make_database_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--overwrite', action='store_true',  # default: false
                         help='Overwrite the graph and the collection if they already exist.')
     parser.add_argument('--make_smart', action='store_true',  # default: false
-                        help='Create a smart graph.')
+                        help='Create a smart graph (ignored for benchmarking with Pregel).')
 
 
 def make_general_graph_parameters_generator(parser: argparse.ArgumentParser) -> None:
@@ -128,3 +128,29 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
                         help='Whether to use disk based files to store temporary results.')
     parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
+    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
+                                                        pagerank - Page Rank; 
+                                                        sssp - Single-Source Shortest Path; 
+                                                        connectedcomponents - Connected Components;
+                                                        wcc - Weakly Connected Components;
+                                                        scc - Strongly Connected Components;
+                                                        hits - Hyperlink-Induced Topic Search;
+                                                        effectivecloseness - Effective Closeness;
+                                                        linerank - LineRank;
+                                                        labelpropagation - Label Propagation;
+                                                        slpa - Speaker-Listener Label Propagation''',
+                        choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
+                                 'linerank', 'labelpropagation', 'slpa'])
+    # pagerank
+    parser.add_argument('--pr_threshold', type=float,
+                        help='If \'algorithm\' is \'pagerank\', execute until the value changes in the vertices '
+                             'are at most pr_threshold. Otherwise ignored.')
+    parser.add_argument('--pr_sourceField', type=str,
+                        help='If \'algorithm\' is \'pagerank\', the attribute of vertices to read the initial '
+                             'rank value from. Otherwise ignored.')
+
+    # sssp
+    parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
+                                              ' Otherwise ignored.')
+    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'pagerank\', the vertex ID to calculate '
+                                                   'distance. Otherwise ignored.')
