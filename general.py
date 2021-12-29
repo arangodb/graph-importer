@@ -1,31 +1,70 @@
+import json
 import os
 import random
+import threading
 
-from psutil import process_iter, NoSuchProcess, AccessDenied, ZombieProcess
 import requests
+from psutil import process_iter, NoSuchProcess, AccessDenied, ZombieProcess
+from requests import Response
 
 from helper_classes import DatabaseInfo
 
 
+def graph_exists(db_info: DatabaseInfo) -> bool:
+    url = os.path.join(db_info.endpoint, f'_api/gharial/{db_info.graph_name}')
+    response = requests.get(url, auth=(db_info.username, db_info.password))
+    return response.status_code == 200
+
+
+def collection_exists(db_info: DatabaseInfo, collection_name: str) -> bool:
+    url = os.path.join(db_info.endpoint, f'_api/collection/{collection_name}')
+    response = requests.get(url, auth=(db_info.username, db_info.password))
+    return response.status_code != 404
+
+
+def get_all_graphs(db_info: DatabaseInfo):
+    url = os.path.join(db_info.endpoint, '_api/gharial')
+    response = requests.get(url, auth=(db_info.username, db_info.password))
+    if response.status_code != 200:
+        raise RuntimeError(f'get_all_graphs error: Error Code: {response.status_code}. Message: {response.text}')
+    s = response.content.decode('utf-8')
+
+    d = json.loads(s)
+    graphs = d['graphs']
+    return [g['_key'] for g in graphs]
+
+
+def get_all_collections(db_info: DatabaseInfo):
+    url = os.path.join(db_info.endpoint, '_api/collection')
+    response = requests.get(url, auth=(db_info.username, db_info.password))
+    if response.status_code != 200:
+        raise RuntimeError(f'get_all_graphs error: Error Code: {response.status_code}. Message: {response.text}')
+    s = response.content.decode('utf-8')
+    d = json.loads(s)
+    collections = d['result']
+    return [c['name'] for c in collections]
+
+
+# todo correct all calls to check overwriting
 def create_graph(db_info: DatabaseInfo):
     """
     Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
-    If overwrite is True and the graph and/or the vertex/edge collection exist, they are dropped first.
+    If the graph and/or the vertex/edge collection exist, they are dropped first.
     :param db_info:
     :return: None
     """
-    if db_info.overwrite:
-        # drop the graph (if it exists)
-        url = os.path.join(db_info.endpoint, '_api/gharial', db_info.graph_name)
-        url = url + '?dropCollections=true'
-        requests.delete(url, auth=(db_info.username, db_info.password))
-        # drop edges
-        url = os.path.join(db_info.endpoint, '_api/collection', db_info.edge_coll_name)
-        requests.delete(url, auth=(db_info.username, db_info.password))
-        # drop vertices
-        url = os.path.join(db_info.endpoint, '_api/collection', db_info.vertices_coll_name)
-        requests.delete(url, auth=(db_info.username, db_info.password))
+    # drop the graph (if it exists)
+    url = os.path.join(db_info.endpoint, '_api/gharial', db_info.graph_name)
+    url = url + '?dropCollections=true'
+    requests.delete(url, auth=(db_info.username, db_info.password))
+    # drop edges
+    url = os.path.join(db_info.endpoint, '_api/collection', db_info.edge_coll_name)
+    requests.delete(url, auth=(db_info.username, db_info.password))
+    # drop vertices
+    url = os.path.join(db_info.endpoint, '_api/collection', db_info.vertices_coll_name)
+    requests.delete(url, auth=(db_info.username, db_info.password))
 
+    # create graph
     url = os.path.join(db_info.endpoint, '_api/gharial')
     if db_info.isSmart:
         response = requests.post(url, auth=(db_info.username, db_info.password), json={
@@ -67,6 +106,17 @@ def create_graph(db_info: DatabaseInfo):
         raise RuntimeError(f'Invalid response from bulk insert{response.text}')
 
 
+class ResponseWrapper:
+    def __init__(self):
+        self.response = Response()
+
+
+def _call_request_post(response_wrapper: ResponseWrapper, url: str, documents: dict, username: str, password: str):
+    response_wrapper.response = requests.post(url, json=documents, auth=(username, password))
+    if response_wrapper.response.status_code != 202:
+        raise RuntimeError(f"Invalid response from bulk insert: {response_wrapper.response.text}")
+
+
 def insert_documents(db_info: DatabaseInfo, documents, collection_name: str):
     """
     Insert an edge or (typically) a list of edges into the edge collection.
@@ -76,9 +126,12 @@ def insert_documents(db_info: DatabaseInfo, documents, collection_name: str):
     :return: None
     """
     url = os.path.join(db_info.endpoint, "_api/document/", collection_name)
-    response = requests.post(url, json=documents, auth=(db_info.username, db_info.password))
-    if response.status_code != 202:
-        raise RuntimeError(f"Invalid response from bulk insert: {response.text}")
+    response_wrapper = ResponseWrapper()
+    thr = threading.Thread(target=_call_request_post,
+                           args=(response_wrapper, url, documents, db_info.username, db_info.password))
+    thr.start()
+    thr.join()
+    # response = requests.post(url, json=documents, auth=(db_info.username, db_info.password))
 
 
 def file_reader(filename, bulk_size):

@@ -21,8 +21,8 @@ python importer.py http://localhost:8529/_db/_system edge-list --edges_file_edge
 - generate a clique (only one direction for every undirected edge):
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system clique \
-    --num_vertices 1000 --graphname Clique --vertex_collection_name cliqueVertices --edge_collection_name cliqueEdges \
+python generator.py http://localhost:8529/_db/_system clique 
+    --num_vertices 1000 --graphname Clique --vertex_collection_name cliqueVertices --edge_collection_name cliqueEdges 
     --overwrite --vertex_property_type random 
     --vertex_property 0.1 0.9 --edge_property_type random --edge_property 0.2 0.8
 ```
@@ -149,7 +149,7 @@ graph is a graph that is the result of the following construction.
 Make a graph with `num_cliques` many vertices, add edges with probability `inter_cliques_density`. Then replace every
 vertex `v` by a set `V` of vertices of size randomly chosen between `min_size_clique` and
 `max_size_clique` with equal probability. Add edges between vertices of `V` where an edge is _not_ added with
-probability `prob_missing`. (We call the subgraph induced by `V` a clique although it is not necessarily a complete
+probability `prob_missing`. (We call the subgraph induced by `V` a clique, although it is not necessarily a complete
 subgraph. The idea is that if `prob_missing` is very low, the resulting subgraph is "almost"
 a clique.) Replace edges `(v,w)` by `num_edges_between_cliques(|V_v|, |V_w|)` edges between the cliques, choosing
 endpoints in the cliques randomly with equal distribution.

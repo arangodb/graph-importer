@@ -29,6 +29,12 @@ class DatabaseInfo:
         self.graph_name = graph_name
         self.endpoint = endpoint
 
+    def copy(self):
+        return DatabaseInfo(self.endpoint, self.graph_name, self.vertices_coll_name, self.edge_coll_name,
+                            self.isSmart, self.replication_factor, self.number_of_shards, self.overwrite,
+                            self.smart_attribute, self.additional_vertex_attribute, self.edge_attribute, self.username,
+                            self.password)
+
 
 class VertexOrEdgeProperty:
     def __init__(self, kind: str, mi: float = 0.0, ma: float = 1.0, val_list: List[str] = None):
@@ -44,7 +50,7 @@ class CliquesGraphInfo:
     def __init__(self,
                  num_cliques: int, min_size_clique: int, max_size_clique: int,
                  prob_missing_one: float, prob_missing_all: float, prob_missing_one_between: float
-                ):
+                 ):
         """
         Information for cliques-graph construction. The graph is the result of the following construction.
         Make a graph with num_cliques many vertices, add edges with probability pron_missing_all.
@@ -56,7 +62,6 @@ class CliquesGraphInfo:
         :param max_size_clique:
         :param prob_missing_one:
         :param prob_missing_all:
-        :param density_between_two_cliques:
         """
         self.prob_missing_one_between = prob_missing_one_between
         self.num_cliques = num_cliques
@@ -67,20 +72,21 @@ class CliquesGraphInfo:
 
 
 class GraphInfo:
-    def __init__(self, hasSelfLoops: bool,
+    def __init__(self,
                  vertex_property: VertexOrEdgeProperty,
                  edge_property: VertexOrEdgeProperty
                  ):
         """
         Information for graph construction.
-        :param hasSelfLoops: whether each vertex has a self-loop
         :param vertex_property:
         :param edge_property:
         """
-        self.hasSelfLoops = hasSelfLoops
         self.vertex_property = vertex_property
         self.edge_property = edge_property
         self.next_id: int = 0
+
+    def copy(self):
+        return GraphInfo(self.vertex_property, self.edge_property)
 
 
 class CliquesHelper:

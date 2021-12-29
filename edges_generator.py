@@ -1,13 +1,10 @@
 import random
-import time
 from typing import List, Dict, Callable, Union, Optional, Iterable
 
 from tqdm import trange
 
-import time_tracking
 from general import yes_with_prob
 from helper_classes import DatabaseInfo, GraphInfo, VertexOrEdgeProperty, CliquesHelper
-from time_tracking import TimeTracking
 from vertices_generator import ConverterToVertex
 
 
@@ -42,8 +39,6 @@ def append_edges(edges: List[Dict], f: int, t: int, to_v: Callable[[Union[int, s
     :param to_v: converts (id, smart_value) to the _id value of a smart vertex
     :param attr_name:
     :param attr_value:
-    :param smart_val:
-    :param db_info:
     :return:
     """
     doc = {"_from": to_v(f), "_to": to_v(t)}
@@ -53,10 +48,9 @@ def append_edges(edges: List[Dict], f: int, t: int, to_v: Callable[[Union[int, s
 
 
 def add_smart_edge(i: int, j: int, edges: List, prob_missing: float, db_info: DatabaseInfo, graph_info: GraphInfo,
-                   to_v: Callable[[Union[int, str]], str], time_tracker: TimeTracking,
+                   to_v: Callable[[Union[int, str]], str],
                    smart_val_i: str, smart_val_j: str):
     assert db_info.isSmart
-    s = time.monotonic()
     if yes_with_prob(prob_missing):
         return False
     if graph_info.edge_property.type == 'none':
@@ -65,13 +59,10 @@ def add_smart_edge(i: int, j: int, edges: List, prob_missing: float, db_info: Da
         append_smart_edges(edges, i, j, to_v, smart_val_i, smart_val_j, db_info.edge_coll_name,
                            str(random.uniform(graph_info.edge_property.min, graph_info.edge_property.max)))
 
-    time_tracker.add_edge_time += time.monotonic() - s
-
 
 def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: DatabaseInfo, graph_info: GraphInfo,
-             to_v: Callable[[Union[int, str]], str], time_tracker: TimeTracking):
+             to_v: Callable[[Union[int, str]], str]):
     assert not db_info.isSmart
-    s = time.monotonic()
     if yes_with_prob(prob_missing):
         return False
     if graph_info.edge_property.type == 'none':
@@ -79,8 +70,6 @@ def add_edge(i: int, j: int, edges: List, prob_missing: float, db_info: Database
     else:  # graph_info.edge_property.type == 'random':
         append_edges(edges, i, j, to_v, db_info.edge_attribute,
                      str(random.uniform(graph_info.edge_property.min, graph_info.edge_property.max)))
-
-    time_tracker.add_edge_time += time.monotonic() - s
 
 
 def get_edge_property(a) -> Union[None, VertexOrEdgeProperty]:
@@ -107,34 +96,35 @@ def get_edge_property(a) -> Union[None, VertexOrEdgeProperty]:
         return VertexOrEdgeProperty('list', val_list=list(a.edge_property))
 
 
-def connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_all: float, prob_missing_one: float,
-                  time_tracker_: time_tracking.TimeTracking, db_info: DatabaseInfo, graph_info: GraphInfo,
-                  be_verbose: bool = True) -> Iterable:
+def make_edges_connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_all: float, prob_missing_one: float,
+                             db_info: DatabaseInfo, graph_info: GraphInfo, start_from_idx: int, end_from_idx: int,
+                             be_verbose: bool = True) -> Iterable:
     """
     Given a list parts of disjoint vertex sets (disjointness is not verified), connect every vertex of every part
     with every vertex of every other part.
+    :param end_from_idx:
+    :param start_from_idx:
     :param prob_missing_all:
     :param prob_missing_one:
     :param graph_info:
     :param db_info:
     :param be_verbose:
-    :param time_tracker_:
     :rtype: None
     :param clique_helper:
-    :param v_coll:
     :param bulk_size_:
     """
-    connect_parts_start_time = time.monotonic()
     edges_ = []
     to_vrtx = ConverterToVertex(db_info.vertices_coll_name).idx_to_smart_vertex if db_info.isSmart else \
         ConverterToVertex(db_info.vertices_coll_name).idx_to_vertex
 
     if be_verbose:
-        generator_ = trange(clique_helper.num_cliques(), desc='Connecting parts to each other', mininterval=1.0,
+        generator_ = trange(start_from_idx, end_from_idx, desc='Connecting parts to each other', mininterval=1.0,
                             unit='connecting a part to all others')
     else:
-        generator_ = range(clique_helper.num_cliques())
+        generator_ = range(start_from_idx, end_from_idx)
 
+    # This code may be executed quite often. Code parts is repeated so as not to check the conditions
+    # in every iteration.
     if db_info.isSmart:
         if db_info.smart_attribute == 'part':
             for c1 in generator_:
@@ -149,10 +139,9 @@ def connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_al
                     smart_value_2 = str(start_2)
                     for f in range(start_1, end_1):
                         for t in range(start_2, end_2):
-                            add_smart_edge(f, t, edges_, prob_missing_one, db_info, graph_info, to_vrtx,
-                                           time_tracker_, smart_value_1, smart_value_2)
+                            add_smart_edge(f, t, edges_, prob_missing_one, db_info, graph_info, to_vrtx, smart_value_1,
+                                           smart_value_2)
                             if len(edges_) >= bulk_size_:
-                                time_tracker_.connect_parts_time += time.monotonic() - connect_parts_start_time
                                 yield edges_
                                 edges_.clear()
         else:
@@ -168,9 +157,8 @@ def connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_al
                         smart_value_f = str(f)
                         for t in range(start_2, end_2):
                             add_smart_edge(f, t, edges_, prob_missing_one, db_info, graph_info, to_vrtx,
-                                           time_tracker_, smart_val_i=smart_value_f, smart_val_j=str(t))
+                                           smart_val_i=smart_value_f, smart_val_j=str(t))
                             if len(edges_) >= bulk_size_:
-                                time_tracker_.connect_parts_time += time.monotonic() - connect_parts_start_time
                                 yield edges_
                                 edges_.clear()
     else:
@@ -184,9 +172,8 @@ def connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_al
                 end_2 = clique_helper.starts_of_cliques[c2 + 1]
                 for f in range(start_1, end_1):
                     for t in range(start_2, end_2):
-                        add_edge(f, t, edges_, prob_missing_one, db_info, graph_info, to_vrtx, time_tracker_)
+                        add_edge(f, t, edges_, prob_missing_one, db_info, graph_info, to_vrtx)
                         if len(edges_) >= bulk_size_:
-                            time_tracker_.connect_parts_time += time.monotonic() - connect_parts_start_time
                             yield edges_
                             edges_.clear()
     if edges_:

@@ -4,7 +4,7 @@ from pathlib import PurePath
 
 from tqdm import tqdm
 
-from general import file_reader, insert_documents, create_graph, get_time_difference_string
+from general import file_reader, insert_documents, create_graph, get_time_difference_string, graph_exists
 from helper_classes import DatabaseInfo
 from vertices_generator import ConverterToVertex
 
@@ -164,6 +164,12 @@ def import_graphalytics(db_info: DatabaseInfo, vertices_filename, edges_filename
     :param bulk_size: the num_vertices of bulks
     :return: None
     """
-    create_graph(db_info)
-    read_and_create_vertices_graphalytics(vertices_filename, properties_filename, db_info, bulk_size, be_verbose)
-    read_and_create_edges_graphalytics(edges_filename, properties_filename, db_info, bulk_size, be_verbose)
+    if graph_exists(db_info) and not db_info.overwrite:
+        if be_verbose:
+            print('The graph exists already, using it.')
+        return
+    else:
+        create_graph(db_info)
+        read_and_create_vertices_graphalytics(vertices_filename, properties_filename, db_info, bulk_size, be_verbose)
+        read_and_create_edges_graphalytics(edges_filename, properties_filename, db_info, bulk_size, be_verbose)
+

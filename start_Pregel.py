@@ -7,6 +7,7 @@ from typing import List, Optional
 
 import requests
 
+from arguments import make_global_parameters, make_database_input_parameters, make_pregel_parameters
 from helper_classes import DatabaseInfo
 
 
@@ -14,62 +15,40 @@ def get_arguments():
     parser = argparse.ArgumentParser(description='Call a Pregel algorithm on the given graph in the given database.')
 
     # general
-    parser.add_argument('--endpoint', type=str, required=False, help='Endpoint, e.g. http://localhost:8529/_db/_system')
-    parser.add_argument('--bulk_size', type=int, nargs='?', default=10000,
-                        help='The number of vertices/edges written in one go.')
-    parser.add_argument('--silent', action='store_true',  # default: False
-                        help='Print progress and statistics.')
-    parser.add_argument('--sleep_time', type=int, default=1000, help='Time in milliseconds to wait before requesting '
+    make_global_parameters(parser)
+
+    parser.add_argument('--sleep_time', type=int, default=1000, help='Time in seconds to wait before requesting '
                                                                      'the status of the Pregel program again.')
-
-    # database
-    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
-    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
-    parser.add_argument('--graphname', default='importedGraph', help='Name of the new graph in the database.')
-    parser.add_argument('--edgeCollections', default='e', help='Name of the new edge relation in the database.')
-    parser.add_argument('--vertexCollections', default='v', help='Name of the new vertex relation in the database.')
-
-    # pregel specific
-    parser.add_argument('--store', action='store_true',  # default: False
-                        help='Whether the results computed by the Pregel algorithm '
-                             'are written back into the source collections.')
-    parser.add_argument('--maxGSS', type=int,
-                        help='Execute a fixed number of iterations (or until the threshold is met).')
-    parser.add_argument('--parallelism', type=int,
-                        help='The maximum number of parallel threads that will execute the Pregel algorithm.')
-    parser.add_argument('--asynchronous', action='store_true',
-                        help='Algorithms which support asynchronous mode will run without synchronized global iterations.')
-    parser.add_argument('--resultField', type=str,
-                        help='The attribute of vertices to write the result into.')
-    parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
-                        help='Whether to use disk based files to store temporary results.')
-    parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
-
-    # subparsers
-    subparsers = parser.add_subparsers(dest='cmd', help='''The name of the Gregel algorithm, one of:
-                                            pagerank - Page Rank; 
-                                            sssp - Single-Source Shortest Path; 
-                                            connectedcomponents - Connected Components;
-                                            wcc - Weakly Connected Components;
-                                            scc - Strongly Connected Components;
-                                            hits - Hyperlink-Induced Topic Search;
-                                            effectivecloseness - Effective Closeness;
-                                            linerank - LineRank;
-                                            labelpropagation - Label Propagation;
-                                            slpa - Speaker-Listener Label Propagation''')
+    make_database_input_parameters(parser)
+    make_pregel_parameters(parser)
 
     # pagerank
-    parser_pr = subparsers.add_parser('pagerank', help='Page Rank')
+    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
+                                                        pagerank - Page Rank; 
+                                                        sssp - Single-Source Shortest Path; 
+                                                        connectedcomponents - Connected Components;
+                                                        wcc - Weakly Connected Components;
+                                                        scc - Strongly Connected Components;
+                                                        hits - Hyperlink-Induced Topic Search;
+                                                        effectivecloseness - Effective Closeness;
+                                                        linerank - LineRank;
+                                                        labelpropagation - Label Propagation;
+                                                        slpa - Speaker-Listener Label Propagation''',
+                        choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
+                                 'linerank', 'labelpropagation', 'slpa'])
 
-    parser_pr.add_argument('--threshold', type=float,
-                           help='Execute until the value changes in the vertices are at most the threshold.')
-    parser_pr.add_argument('--sourceField', type=str,
-                           help='The attribute of vertices to read the initial rank value from.')
+    parser.add_argument('--pr_threshold', type=float,
+                        help='If \'algorithm\' is \'pagerank\', execute until the value changes in the vertices '
+                             'are at most pr_threshold. Otherwise ignored.')
+    parser.add_argument('--pr_sourceField', type=str,
+                        help='If \'algorithm\' is \'pagerank\', the attribute of vertices to read the initial '
+                             'rank value from. Otherwise ignored.')
 
     # sssp
-    parser_sssp = subparsers.add_parser('sssp', help='Single-Source Shortest Path')
-    parser_sssp.add_argument('--source', help='The vertex ID to calculate distances ')
-    parser_sssp.add_argument('--sssp_resultField', help='The vertex ID to calculate distances ')
+    parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
+                                              ' Otherwise ignored.')
+    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'pagerank\', the vertex ID to calculate '
+                                                   'distance. Otherwise ignored.')
 
     arguments = parser.parse_args()
 
@@ -85,14 +64,14 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str,
     """
     url = os.path.join(db_info.endpoint, "_api/control_pregel/")
 
-    json = {"algorithm": algorithm_name}
+    json_ = {"algorithm": algorithm_name}
     if db_info.graph_name:
-        json['graphName'] = db_info.graph_name
+        json_['graphName'] = db_info.graph_name
     else:
-        json['vertexCollections'] = vertexCollections
-        json['edgeCollections'] = edgeCollections
+        json_['vertexCollections'] = vertexCollections
+        json_['edgeCollections'] = edgeCollections
 
-    response = requests.post(url, json=json, params=params, auth=(db_info.username, db_info.password))
+    response = requests.post(url, json=json_, params=params, auth=(db_info.username, db_info.password))
     if response.status_code == 400:
         reason = 'the set of collections for the Pregel job includes a system collection, ' \
                  'or the collections do not conform to the sharding requirements for Pregel jobs.'
@@ -144,10 +123,10 @@ def print_pregel_status_variable(d: json) -> None:
     information = ''
     for key, value in d.items():
         if key in [
-            # these values are always the same:
-            'id', 'database', 'algorithm', 'created', 'ttl',
-            # these values seem to appear only when 'state' == 'done'
-            'expires', 'storageTime', 'vertexCount', 'edgeCount']:
+                # these values are always the same:
+                'id', 'database', 'algorithm', 'created', 'ttl',
+                # these values seem to appear only when 'state' == 'done'
+                'expires', 'storageTime', 'vertexCount', 'edgeCount']:
             continue
         if type(value) == float:
             val = f'{value:.5f}'
@@ -162,6 +141,40 @@ def print_pregel_status_variable(d: json) -> None:
         information += f'{val:<{get_width(key)}}'
 
     print(f'{information:15}')
+
+
+def print_pregel_status(db_info: DatabaseInfo, algorithm_id: str, sleep_time: float):
+    status = get_pregel_exec_status(db_info, algorithm_id)
+    if status.status_code == 200:
+        d = json.loads(status.text.strip('"'))
+        print(f'id: {d["id"]}')
+        print(f'database: {d["database"]}')
+        print(f'algorithm: {d["algorithm"]}')
+        print(f'created: {d["created"]}')
+        print(f'ttl: {d["ttl"]}')
+        print()
+        # print column names
+        first_line = ''
+        for key, value in d.items():
+            if key in ['id', 'database', 'algorithm', 'created', 'ttl']:
+                continue
+            first_line += f'{key:<{get_width(key)}}'
+        print(first_line + '\n')
+    else:
+        raise RuntimeError(f'Pregel returned error. Error code: {status.status_code}. Message: {status.text}')
+
+    while d['state'] == 'running' or d['state'] == 'storing' or d['state'] == 'recovering':
+        sleep(sleep_time)
+        print_pregel_status_variable(d)
+        status = get_pregel_exec_status(db_info, algorithm_id)
+        d = json.loads(status.text.strip('"'))
+    print_pregel_status_variable(d)
+    print()
+    for key, value in d.items():
+        if key in ['expires', 'storageTime', 'vertexCount', 'edgeCount']:
+            print(f'{key}: {value}')
+
+    exit(0)
 
 
 if __name__ == "__main__":
@@ -189,48 +202,18 @@ if __name__ == "__main__":
         params['shardKeyAttribute'] = args.shardKeyAttribute
 
     # pagerank
-    if args.cmd == 'pagerank':
-        if args.threshold:
-            params['threshold'] = args.threshold
-        if args.sourceField:
-            params['sourceField'] = args.sourceField
+    if args.algorithm == 'pagerank':
+        if args.pr_threshold:
+            params['threshold'] = args.pr_threshold
+        if args.pr_sourceField:
+            params['sourceField'] = args.pr_sourceField
 
-        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edgeCollections, args.vertexCollections,
-                                             params).strip('"')
-        status = get_pregel_exec_status(db_info, algorithm_id)
-        if status.status_code == 200:
-            d = json.loads(status.text.strip('"'))
-            print(f'id: {d["id"]}')
-            print(f'database: {d["database"]}')
-            print(f'algorithm: {d["algorithm"]}')
-            print(f'created: {d["created"]}')
-            print(f'ttl: {d["ttl"]}')
-            print()
-            # print column names
-            first_line = ''
-            for key, value in d.items():
-                if key in ['id', 'database', 'algorithm', 'created', 'ttl']:
-                    continue
-                first_line += f'{key:<{get_width(key)}}'
-            print(first_line + '\n')
-        else:
-            raise RuntimeError(f'Pregel returned error. Error code: {status.status_code}. Message: {status.text}')
-
-        while d['state'] == 'running' or d['state'] == 'storing' or d['state'] == 'recovering':
-            sleep(args.sleep_time)
-            print_pregel_status_variable(d)
-            status = get_pregel_exec_status(db_info, algorithm_id)
-            d = json.loads(status.text.strip('"'))
-        print_pregel_status_variable(d)
-        print()
-        for key, value in d.items():
-            if key in ['expires', 'storageTime', 'vertexCount', 'edgeCount']:
-                print(f'{key}: {value}')
-
-        exit(0)
+        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
+                                             args.vertex_collection_name, params).strip('"')
+        print_pregel_status(db_info, algorithm_id, args.sleep_time)
     # sssp
-    if args.cmd == 'sssp':
-        if args.source:
-            params['source'] = args.source
+    if args.algorithm == 'sssp':
+        if args.sssp_source:
+            params['source'] = args.sssp_source
         if args.sssp_resultField:
             params['_resultField'] = args.sssp_resultField

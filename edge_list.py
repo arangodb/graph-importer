@@ -1,9 +1,8 @@
-import os.path
+from tqdm import tqdm
 
-from general import file_reader, insert_documents, create_graph
+from general import file_reader, insert_documents, create_graph, graph_exists
 from helper_classes import DatabaseInfo
 from vertices_generator import insert_vertices_unique, ConverterToVertex
-from tqdm import tqdm
 
 
 def read_and_create_vertices_and_edges(db_info: DatabaseInfo, edges_filename, bulk_size, be_verbose: bool):
@@ -57,6 +56,11 @@ def read_and_create_vertices_and_edges(db_info: DatabaseInfo, edges_filename, bu
             insert_vertices_unique(db_info, vertex_indexes)
             insert_documents(db_info, edges, db_info.edge_coll_name)
 
+
 def import_edge_list(db_info: DatabaseInfo, filename, bulk_size, be_verbose: bool):
-    create_graph(db_info)
-    read_and_create_vertices_and_edges(db_info, filename, bulk_size, be_verbose)
+    if db_info.overwrite or not graph_exists(db_info):
+        create_graph(db_info)
+        read_and_create_vertices_and_edges(db_info, filename, bulk_size, be_verbose)
+    else:
+        if be_verbose:
+            print(f'The graph {db_info.graph_name} exists already, skipping. To overwrite, use \'--overwrite\'.')
