@@ -35,6 +35,6 @@ def create_k_partite_graph(db_info: DatabaseInfo,
         make_and_insert_vertices(db_info, graph_info, size, bulk_size, add_part=True, c_helper=c_helper)
 
     # create edges between cliques
-
+    # todo finish making parallel
     for edges in make_edges_connect_parts(c_helper, bulk_size, 0.0, 0.0, db_info, graph_info, be_verbose):
         insert_documents(db_info, edges, db_info.edge_coll_name)

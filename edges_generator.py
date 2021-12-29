@@ -96,9 +96,9 @@ def get_edge_property(a) -> Union[None, VertexOrEdgeProperty]:
         return VertexOrEdgeProperty('list', val_list=list(a.edge_property))
 
 
-def make_edges_connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_all: float, prob_missing_one: float,
-                             db_info: DatabaseInfo, graph_info: GraphInfo, start_from_idx: int, end_from_idx: int,
-                             be_verbose: bool = True) -> Iterable:
+def make_edges_connect_parts(clique_helper: CliquesHelper, bulk_size_: int, prob_missing_all: float,
+                             prob_missing_one: float, db_info: DatabaseInfo, graph_info: GraphInfo, start_from_idx: int,
+                             end_from_idx: int, be_verbose: bool = True) -> Iterable:
     """
     Given a list parts of disjoint vertex sets (disjointness is not verified), connect every vertex of every part
     with every vertex of every other part.

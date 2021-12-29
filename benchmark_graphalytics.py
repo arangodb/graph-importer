@@ -8,6 +8,7 @@ from urllib.request import urlopen
 import zstandard
 from tqdm import tqdm
 
+from arguments import make_global_parameters, make_database_parameters, make_pregel_parameters
 from general import get_time_difference_string
 from graphalytics_importer import import_graphalytics, import_graphalytics_get_files
 from helper_classes import DatabaseInfo
@@ -66,12 +67,10 @@ ALL_DATASOUCES_NAMES = list(SMALL_DATASOUCES.keys()) + list(BIG_DATASOURCES.keys
 def get_arguments():
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
-    # global
-    parser.add_argument('endpoint', type=str, help='Endpoint, e.g. http://localhost:8529/_db/_system')
-    parser.add_argument('--bulk_size', type=int, nargs='?', default=10000,
-                        help='The number of vertices/edges written in one go.')
-    parser.add_argument('--silent', action='store_true',  # default: False
-                        help='Print progress and statistics.')
+    make_global_parameters(parser)
+    make_database_parameters(parser)
+    make_pregel_parameters(parser)
+
     parser.add_argument('--overwrite_file', action='store_true',  # default: False
                         help='Whether to overwrite the file if it exists.')
     parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
@@ -85,64 +84,7 @@ def get_arguments():
     parser.add_argument('dataset', choices=ALL_DATASOUCES_NAMES + ['all'],
                         help='The dataset, either \'all\' or one of.' + str(ALL_DATASOUCES_NAMES))
 
-    # database parameters
-    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
-    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
-    parser.add_argument('--graphname', default='generatedGraph', help='Name of the new graph in the database.')
-    parser.add_argument('--edge_collection_name', default='e', help='Name of the new edge collection in the database.')
-    parser.add_argument('--vertex_collection_name', default='v', help='Name of the new vertex collection'
-                                                                      ' in the database.')
-    parser.add_argument('--make_smart', action='store_true',  # default: false
-                        help='Create a smart graph.')
-    parser.add_argument('--num_shards', default=5, type=int, help='Number of shards.')
-    parser.add_argument('--repl_factor', default=2, type=int, help='Replication factor.')
-    parser.add_argument('--smart_attribute', default='smartProp',
-                        help='The name of the attribute to shard the vertices after.')
-    parser.add_argument('--overwrite', action='store_true',  # default: false
-                        help='Overwrite the graph and the collection if they already exist.')
-
-    # pregel specific
-    parser.add_argument('--store', action='store_true',  # default: False
-                        help='Whether the results computed by the Pregel algorithm '
-                             'are written back into the source collections.')
-    parser.add_argument('--maxGSS', type=int,
-                        help='Execute a fixed number of iterations (or until the threshold is met).')
-    parser.add_argument('--parallelism', type=int,
-                        help='The maximum number of parallel threads that will execute the Pregel algorithm.')
-    parser.add_argument('--asynchronous', action='store_true',
-                        help='Algorithms which support asynchronous mode will run without synchronized '
-                             'global iterations.')
-    parser.add_argument('--resultField', type=str,
-                        help='The attribute of vertices to write the result into.')
-    parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
-                        help='Whether to use disk based files to store temporary results.')
-    parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
-
-    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
-                                            pagerank - Page Rank; 
-                                            sssp - Single-Source Shortest Path; 
-                                            connectedcomponents - Connected Components;
-                                            wcc - Weakly Connected Components;
-                                            scc - Strongly Connected Components;
-                                            hits - Hyperlink-Induced Topic Search;
-                                            effectivecloseness - Effective Closeness;
-                                            linerank - LineRank;
-                                            labelpropagation - Label Propagation;
-                                            slpa - Speaker-Listener Label Propagation''')
-
-    parser.add_argument('--pagerank_threshold', type=float,
-                        help='Execute until the value changes in the vertices are at most the threshold.')
-    parser.add_argument('--pagerank_sourceField', type=str,
-                        help='The attribute of vertices to read the initial rank value from.')
-
-    parser.add_argument('--sssp_source', help='The vertex ID to calculate distances from.')
-    parser.add_argument('--sssp_resultField', help='The vertex ID to calculate distances from.')
-
     arguments = parser.parse_args()
-
-    # check parameters
-    if arguments.make_smart and not arguments.smart_attribute:
-        raise RuntimeError('If --make_smart is given, then also --smart_attribute must be given.')
 
     return arguments
 
@@ -185,41 +127,14 @@ def download(url: str, filename: Optional[str] = None, append: bool = False, be_
 
 
 if __name__ == "__main__":
+    # read arguments
     args = get_arguments()
     overwrite = args.overwrite
     be_verbose = not args.silent
     dataset = args.dataset
     target_directory = args.target_directory + os.sep + dataset if args.target_directory else dataset
 
-    filename = dataset + '.tar.zst'
-
-    if dataset in BIG_DATASOURCES:
-        append = False
-        for url in BIG_DATASOURCES[dataset]:
-            download(url, filename, append=append, be_verbose=be_verbose)
-            append = True
-    elif dataset in SMALL_DATASOUCES:
-        url = SMALL_DATASOUCES[dataset]
-        download(url, filename, be_verbose=be_verbose)
-
-    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
-                           args.edge_collection_name, args.make_smart,
-                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
-                           '', 'weight', args.user, args.pwd)
-
-    dctx = zstandard.ZstdDecompressor()
-    with open(filename, 'rb') as ifh:
-        with open('output.tar', 'wb') as ofh:
-            dctx.copy_stream(ifh, ofh)
-
-    tar_file = tarfile.open('output.tar')
-    tar_file.extractall(target_directory)
-
-    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
-    start = time.monotonic()
-    import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
-                        not args.silent)
-
+    #   parameters for Pregel
     params = dict()
     if args.store:
         params['store'] = 'true'
@@ -236,17 +151,53 @@ if __name__ == "__main__":
     if args.shardKeyAttribute:
         params['shardKeyAttribute'] = args.shardKeyAttribute
 
-        # pagerank
+    # download
+    filename = dataset + '.tar.zst'
+    if dataset in BIG_DATASOURCES:
+        append = False
+        for url in BIG_DATASOURCES[dataset]:
+            download(url, filename, append=append, be_verbose=be_verbose)
+            append = True
+    elif dataset in SMALL_DATASOUCES:
+        url = SMALL_DATASOUCES[dataset]
+        download(url, filename, be_verbose=be_verbose)
+
+    # extract
+    dctx = zstandard.ZstdDecompressor()
+    with open(filename, 'rb') as ifh:
+        with open('output.tar', 'wb') as ofh:
+            dctx.copy_stream(ifh, ofh)
+
+    tar_file = tarfile.open('output.tar')
+    tar_file.extractall(target_directory)
+
+    # find graphalytics files
+    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
+
+    # prepare data structures
+    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
+                           args.edge_collection_name, True,
+                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
+                           '', 'weight', args.user, args.pwd)
+
+    # import
+    start = time.monotonic()
+    import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
+                        not args.silent)
+
+    # execute
+    #   pagerank
     if args.algorithm == 'pagerank':
-        if args.pagerank_threshold:
-            params['threshold'] = args.pagerank_threshold
-        if args.pagerank_sourceField:
-            params['sourceField'] = args.pagerank_sourceField
+        if args.pr_threshold:
+            params['threshold'] = args.pr_threshold
+        if args.pr_sourceField:
+            params['sourceField'] = args.pr_sourceField
 
         algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
                                              args.vertex_collection_name,
                                              params).strip('"')
         print_pregel_status(db_info, algorithm_id, args.sleep_time)
 
+    # print statistics
     if not args.silent:
         print('Total time: ' + get_time_difference_string(time.monotonic() - start))

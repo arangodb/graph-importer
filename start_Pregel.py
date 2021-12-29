@@ -22,36 +22,7 @@ def get_arguments():
     make_database_input_parameters(parser)
     make_pregel_parameters(parser)
 
-    # pagerank
-    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
-                                                        pagerank - Page Rank; 
-                                                        sssp - Single-Source Shortest Path; 
-                                                        connectedcomponents - Connected Components;
-                                                        wcc - Weakly Connected Components;
-                                                        scc - Strongly Connected Components;
-                                                        hits - Hyperlink-Induced Topic Search;
-                                                        effectivecloseness - Effective Closeness;
-                                                        linerank - LineRank;
-                                                        labelpropagation - Label Propagation;
-                                                        slpa - Speaker-Listener Label Propagation''',
-                        choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
-                                 'linerank', 'labelpropagation', 'slpa'])
-
-    parser.add_argument('--pr_threshold', type=float,
-                        help='If \'algorithm\' is \'pagerank\', execute until the value changes in the vertices '
-                             'are at most pr_threshold. Otherwise ignored.')
-    parser.add_argument('--pr_sourceField', type=str,
-                        help='If \'algorithm\' is \'pagerank\', the attribute of vertices to read the initial '
-                             'rank value from. Otherwise ignored.')
-
-    # sssp
-    parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
-                                              ' Otherwise ignored.')
-    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'pagerank\', the vertex ID to calculate '
-                                                   'distance. Otherwise ignored.')
-
     arguments = parser.parse_args()
-
     return arguments
 
 
