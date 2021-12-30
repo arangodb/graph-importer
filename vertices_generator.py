@@ -1,6 +1,6 @@
 import os
 import random
-from typing import Union
+from typing import Union, Optional
 
 import requests
 import tqdm
@@ -150,8 +150,11 @@ class ConverterToVertex:
     def __init__(self, vertex_coll_name: str):
         self.vertex_coll_name = vertex_coll_name
 
-    def idx_to_smart_vertex(self, idx: Union[int, str], smart_value: str) -> str:
-        return f"{self.vertex_coll_name}/{smart_value}:{idx}"
+    def idx_to_smart_vertex(self, idx: Union[int, str], smart_value: Optional[str] = None) -> str:
+        if smart_value:
+            return f'{self.vertex_coll_name}/{smart_value}:{idx}'
+        else:
+            return f'{self.vertex_coll_name}/{idx}:{idx}'
 
     def idx_to_vertex(self, idx: Union[int, str]):
         return f"{self.vertex_coll_name}/{idx}"

@@ -33,7 +33,7 @@ def make_database_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--overwrite', action='store_true',  # default: false
                         help='Overwrite the graph and the collection if they already exist.')
     parser.add_argument('--make_smart', action='store_true',  # default: false
-                        help='Create a smart graph.')
+                        help='Create a smart graph (ignored for benchmarking with Pregel).')
 
 
 def make_general_graph_parameters_generator(parser: argparse.ArgumentParser) -> None:
@@ -149,10 +149,14 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
                                  'linerank', 'labelpropagation', 'slpa'])
     # pagerank
     parser.add_argument('--pr_threshold', type=float,
-                        help='Execute until the value changes in the vertices are at most the threshold.')
+                        help='If \'algorithm\' is \'pagerank\', execute until the value changes in the vertices '
+                             'are at most pr_threshold. Otherwise ignored.')
     parser.add_argument('--pr_sourceField', type=str,
-                        help='The attribute of vertices to read the initial rank value from.')
+                        help='If \'algorithm\' is \'pagerank\', the attribute of vertices to read the initial '
+                             'rank value from. Otherwise ignored.')
 
     # sssp
-    parser.add_argument('--sssp_source', help='The vertex ID to calculate distances from.')
-    parser.add_argument('--sssp_resultField', help='The vertex ID to calculate distances from.')
+    parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
+                                              ' Otherwise ignored.')
+    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate '
+                                                   'distance. Otherwise ignored.')

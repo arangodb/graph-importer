@@ -67,7 +67,7 @@ ALL_DATASOUCES_NAMES = list(SMALL_DATASOUCES.keys()) + list(BIG_DATASOURCES.keys
 def get_arguments():
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
-    # global
+    # global 
     make_global_parameters(parser)
     make_database_parameters(parser)
     make_pregel_parameters(parser)
@@ -79,12 +79,7 @@ def get_arguments():
     parser.add_argument('dataset', choices=ALL_DATASOUCES_NAMES + ['all'],
                         help='The dataset, either \'all\' or one of.' + str(ALL_DATASOUCES_NAMES))
 
-
     arguments = parser.parse_args()
-
-    # check parameters
-    if arguments.make_smart and not arguments.smart_attribute:
-        raise RuntimeError('If --make_smart is given, then also --smart_attribute must be given.')
 
     return arguments
 
@@ -127,41 +122,14 @@ def download(url: str, filename: Optional[str] = None, append: bool = False, be_
 
 
 if __name__ == "__main__":
+    # read arguments
     args = get_arguments()
     overwrite = args.overwrite
     be_verbose = not args.silent
     dataset = args.dataset
     target_directory = args.target_directory + os.sep + dataset if args.target_directory else dataset
 
-    filename = dataset + '.tar.zst'
-
-    if dataset in BIG_DATASOURCES:
-        append = False
-        for url in BIG_DATASOURCES[dataset]:
-            download(url, filename, append=append, be_verbose=be_verbose)
-            append = True
-    elif dataset in SMALL_DATASOUCES:
-        url = SMALL_DATASOUCES[dataset]
-        download(url, filename, be_verbose=be_verbose)
-
-    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
-                           args.edge_collection_name, args.make_smart,
-                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
-                           '', 'weight', args.user, args.pwd)
-
-    dctx = zstandard.ZstdDecompressor()
-    with open(filename, 'rb') as ifh:
-        with open('output.tar', 'wb') as ofh:
-            dctx.copy_stream(ifh, ofh)
-
-    tar_file = tarfile.open('output.tar')
-    tar_file.extractall(target_directory)
-
-    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
-    start = time.monotonic()
-    import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
-                        not args.silent)
-
+    #   parameters for Pregel
     params = dict()
     if args.store:
         params['store'] = 'true'
@@ -178,15 +146,51 @@ if __name__ == "__main__":
     if args.shardKeyAttribute:
         params['shardKeyAttribute'] = args.shardKeyAttribute
 
-        # pagerank
+    # download
+    filename = dataset + '.tar.zst'
+    if dataset in BIG_DATASOURCES:
+        append = False
+        for url in BIG_DATASOURCES[dataset]:
+            download(url, filename, append=append, be_verbose=be_verbose)
+            append = True
+    elif dataset in SMALL_DATASOUCES:
+        url = SMALL_DATASOUCES[dataset]
+        download(url, filename, be_verbose=be_verbose)
+
+    # extract
+    dctx = zstandard.ZstdDecompressor()
+    with open(filename, 'rb') as ifh:
+        with open('output.tar', 'wb') as ofh:
+            dctx.copy_stream(ifh, ofh)
+
+    tar_file = tarfile.open('output.tar')
+    tar_file.extractall(target_directory)
+
+    # find graphalytics files
+    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
+
+    # prepare data structures
+    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
+                           args.edge_collection_name, True,
+                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
+                           '', 'weight', args.user, args.pwd)
+
+    # import
+    start = time.monotonic()
+    import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
+                        not args.silent)
+
+    # execute
+    #   pagerank
     if args.algorithm == 'pagerank':
-        if args.pagerank_threshold:
-            params['threshold'] = args.pagerank_threshold
-        if args.pagerank_sourceField:
-            params['sourceField'] = args.pagerank_sourceField
+        if args.pr_threshold:
+            params['threshold'] = args.pr_threshold
+        if args.pr_sourceField:
+            params['sourceField'] = args.pr_sourceField
 
         algorithm_id = call_pregel_algorithm(db_info, 'pagerank', params).strip('"')
         print_pregel_status(db_info, algorithm_id, args.sleep_time)
 
+    # print statistics
     if not args.silent:
         print('Total time: ' + get_time_difference_string(time.monotonic() - start))

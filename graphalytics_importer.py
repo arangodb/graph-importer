@@ -125,7 +125,7 @@ def read_and_create_edges_graphalytics(edges_filename, properties_filename, db_i
 
     num_edges = get_property_graphalytics(properties_filename, 'num_edges')
     print(f'Number of edges: {num_edges}')
-    to_v = ConverterToVertex(db_info.vertices_coll_name).idx_to_vertex
+    to_v = ConverterToVertex(db_info.vertices_coll_name).idx_to_smart_vertex
 
     start_e = time.monotonic()
     if be_verbose:

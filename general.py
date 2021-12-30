@@ -45,7 +45,6 @@ def get_all_collections(db_info: DatabaseInfo):
     return [c['name'] for c in collections]
 
 
-# todo correct all calls to check overwriting
 def create_graph(db_info: DatabaseInfo):
     """
     Create a new smart graph with vertices v_coll and edges edge_coll_name with given parameters.
