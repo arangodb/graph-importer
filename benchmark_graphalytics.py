@@ -8,6 +8,7 @@ from urllib.request import urlopen
 import zstandard
 from tqdm import tqdm
 
+from arguments import make_global_parameters, make_database_parameters, make_pregel_parameters
 from general import get_time_difference_string
 from graphalytics_importer import import_graphalytics, import_graphalytics_get_files
 from helper_classes import DatabaseInfo
@@ -51,14 +52,14 @@ SMALL_DATASOUCES = {'cit-Patents': 'https://surfdrive.surf.nl/files/index.php/s/
                     'twitter_mpi': 'https://surfdrive.surf.nl/files/index.php/s/keuUstVmhPAIW3A/download',
                     'wiki-Talk': 'https://surfdrive.surf.nl/files/index.php/s/c5dT1fwzXaNHT8j/download'}
 
-BIG_DATASOURCES = {'datagen-sf10k-fb': ['https://surfdrive.surf.nl/files/index.php/s/mQpAeUD4HIdh88R/download',
-                                        'https://surfdrive.surf.nl/files/index.php/s/bLthhT3tQytnlM0/download'
-                                        ],
-                   'graph500-30': ['https://surfdrive.surf.nl/files/index.php/s/07HY4YvhsFp3awr/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/QMy60s36HBYXliD/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/K0SsxPKogKZu86P/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/E5ZgpdUyDxVMP9O/download'
-                                   ]}
+BIG_DATASOURCES = {} #{'datagen-sf10k-fb': ['https://surfdrive.surf.nl/files/index.php/s/mQpAeUD4HIdh88R/download',
+#                                         'https://surfdrive.surf.nl/files/index.php/s/bLthhT3tQytnlM0/download'
+#                                         ],
+#                    'graph500-30': ['https://surfdrive.surf.nl/files/index.php/s/07HY4YvhsFp3awr/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/QMy60s36HBYXliD/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/K0SsxPKogKZu86P/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/E5ZgpdUyDxVMP9O/download'
+#                                    ]}
 
 ALL_DATASOUCES_NAMES = list(SMALL_DATASOUCES.keys()) + list(BIG_DATASOURCES.keys())
 
@@ -67,76 +68,17 @@ def get_arguments():
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
     # global
-    parser.add_argument('endpoint', type=str, help='Endpoint, e.g. http://localhost:8529/_db/_system')
-    parser.add_argument('--bulk_size', type=int, nargs='?', default=10000,
-                        help='The number of vertices/edges written in one go.')
-    parser.add_argument('--silent', action='store_true',  # default: False
-                        help='Print progress and statistics.')
-    parser.add_argument('--overwrite_file', action='store_true',  # default: False
-                        help='Whether to overwrite the file if it exists.')
-    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
-                                                                  'the status of the Pregel program again.')
+    make_global_parameters(parser)
+    make_database_parameters(parser)
+    make_pregel_parameters(parser)
+
     parser.add_argument('--remove_archive', action='store_true',  # default: False
                         help='Whether to remove the archive file.')
-    parser.add_argument('--remove_graph_files', action='store_true',  # default: False
-                        help='Whether to remove the graph files file extracted from the archive.')
     parser.add_argument('--target_directory', action='store_true',  # default: False
                         help='The directory to extract downloaded files.')
     parser.add_argument('dataset', choices=ALL_DATASOUCES_NAMES + ['all'],
                         help='The dataset, either \'all\' or one of.' + str(ALL_DATASOUCES_NAMES))
 
-    # database parameters
-    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
-    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
-    parser.add_argument('--graphname', default='generatedGraph', help='Name of the new graph in the database.')
-    parser.add_argument('--edge_collection_name', default='e', help='Name of the new edge collection in the database.')
-    parser.add_argument('--vertex_collection_name', default='v', help='Name of the new vertex collection'
-                                                                      ' in the database.')
-    parser.add_argument('--make_smart', action='store_true',  # default: false
-                        help='Create a smart graph.')
-    parser.add_argument('--num_shards', default=5, type=int, help='Number of shards.')
-    parser.add_argument('--repl_factor', default=2, type=int, help='Replication factor.')
-    parser.add_argument('--smart_attribute', default='smartProp',
-                        help='The name of the attribute to shard the vertices after.')
-    parser.add_argument('--overwrite', action='store_true',  # default: false
-                        help='Overwrite the graph and the collection if they already exist.')
-
-    # pregel specific
-    parser.add_argument('--store', action='store_true',  # default: False
-                        help='Whether the results computed by the Pregel algorithm '
-                             'are written back into the source collections.')
-    parser.add_argument('--maxGSS', type=int,
-                        help='Execute a fixed number of iterations (or until the threshold is met).')
-    parser.add_argument('--parallelism', type=int,
-                        help='The maximum number of parallel threads that will execute the Pregel algorithm.')
-    parser.add_argument('--asynchronous', action='store_true',
-                        help='Algorithms which support asynchronous mode will run without synchronized '
-                             'global iterations.')
-    parser.add_argument('--resultField', type=str,
-                        help='The attribute of vertices to write the result into.')
-    parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
-                        help='Whether to use disk based files to store temporary results.')
-    parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
-
-    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
-                                            pagerank - Page Rank; 
-                                            sssp - Single-Source Shortest Path; 
-                                            connectedcomponents - Connected Components;
-                                            wcc - Weakly Connected Components;
-                                            scc - Strongly Connected Components;
-                                            hits - Hyperlink-Induced Topic Search;
-                                            effectivecloseness - Effective Closeness;
-                                            linerank - LineRank;
-                                            labelpropagation - Label Propagation;
-                                            slpa - Speaker-Listener Label Propagation''')
-
-    parser.add_argument('--pagerank_threshold', type=float,
-                        help='Execute until the value changes in the vertices are at most the threshold.')
-    parser.add_argument('--pagerank_sourceField', type=str,
-                        help='The attribute of vertices to read the initial rank value from.')
-
-    parser.add_argument('--sssp_source', help='The vertex ID to calculate distances from.')
-    parser.add_argument('--sssp_resultField', help='The vertex ID to calculate distances from.')
 
     arguments = parser.parse_args()
 
@@ -243,9 +185,7 @@ if __name__ == "__main__":
         if args.pagerank_sourceField:
             params['sourceField'] = args.pagerank_sourceField
 
-        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
-                                             args.vertex_collection_name,
-                                             params).strip('"')
+        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', params).strip('"')
         print_pregel_status(db_info, algorithm_id, args.sleep_time)
 
     if not args.silent:

@@ -128,3 +128,31 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
                         help='Whether to use disk based files to store temporary results.')
     parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
+
+    # Pregel watching
+    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
+                                                                     'the status of the Pregel program again.')
+
+    # the algorithm
+    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
+                                             pagerank - Page Rank; 
+                                             sssp - Single-Source Shortest Path; 
+                                             connectedcomponents - Connected Components;
+                                             wcc - Weakly Connected Components;
+                                             scc - Strongly Connected Components;
+                                             hits - Hyperlink-Induced Topic Search;
+                                             effectivecloseness - Effective Closeness;
+                                             linerank - LineRank;
+                                             labelpropagation - Label Propagation;
+                                             slpa - Speaker-Listener Label Propagation''',
+                        choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
+                                 'linerank', 'labelpropagation', 'slpa'])
+    # pagerank
+    parser.add_argument('--pr_threshold', type=float,
+                        help='Execute until the value changes in the vertices are at most the threshold.')
+    parser.add_argument('--pr_sourceField', type=str,
+                        help='The attribute of vertices to read the initial rank value from.')
+
+    # sssp
+    parser.add_argument('--sssp_source', help='The vertex ID to calculate distances from.')
+    parser.add_argument('--sssp_resultField', help='The vertex ID to calculate distances from.')

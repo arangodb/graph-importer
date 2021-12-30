@@ -6,16 +6,32 @@ and to generate graphs in a running instance.
 
 # TL;DR:
 
+- run the Pregel PageRank program on graph `generatedGraph`, write the result into the field `res_field`,
+update status every `5` seconds, run until value change is at most `0.00001`:
+```commandline
+python start_Pregel.py --endpoint http://localhost:8529/ --graphname generatedGraph 
+    --resultField res_field 
+    --sleep_time 5 --pr_threshold 0.00001 pagerank
+```
+
+- download the `cit-Patents` dataset from the Graphalytics website, import the graph and 
+run Pregel PageRank until value change is at most `0.00001`:
+```commandline
+python benchmark_graphalytics.py --endpoint http://localhost:8529/ pagerank cit-Patents 
+     --pr_threshold 0.00001
+```
+
+
 - importing a Graphalytics graph:
 
 ```commandline
-python importer.py http://localhost:8529/_db/_system graphalytics --dir_graphalytics /PATH/GRAPH_DIRECTORY 
+python importer.py --endpoint http://localhost:8529/_db/_system graphalytics --dir_graphalytics /PATH/GRAPH_DIRECTORY 
 ```
 
 - importing a graph saved as a list of edges:
 
 ```commandline
-python importer.py http://localhost:8529/_db/_system edge-list --edges_file_edge_list /PATH/GRAPH_FILE 
+python importer.py --endpoint http://localhost:8529/_db/_system edge-list --edges_file_edge_list /PATH/GRAPH_FILE 
 ```
 
 - generate a clique (only one direction for every undirected edge):
@@ -214,3 +230,51 @@ The script `generator.py` has at least two arguments:
     - `--density_between_two_cliques`: the density of edges between two cliques, i.e., if the cliques have sizes s1 and
       s2, '
       'and there are m edges between the two cliques, the density is m/(s1*s2).
+
+# Running Pregel
+It is possible to start a Pregel algorithm and to observe its progress while it is working.
+The script is `start_Pregel.py`, which can be called with the following parameters. 
+- `--endpoint`: the server address, e.g., `http://localhost:8529/_db/_system`
+- `--graphname`: the name of an existing graph
+- `--silent`: is ignored 
+- `--store:`, `--maxGSS`, `--parallelism`, `--async`, `--resultField`, `--useMemoryMaps`, 
+`--shardKeyAttribute`: see [Pregel documentation](https://www.arangodb.com/docs/stable/graphs-pregel.html)
+- `--sleep_time`: time in seconds to wait between requesting the Pregel status
+- `--user`: your username
+- `--pwd`: your password
+- `--algorithm`: the name of the Pregel algorithm, one of:
+  - `pagerank` - Page Rank;
+  - `sssp` - Single-Source Shortest Path;
+  - `connectedcomponents` - Connected Components;
+  - `wcc` - Weakly Connected Components;
+  - `scc` - Strongly Connected Components;
+  - `hits` - Hyperlink-Induced Topic Search;
+  - `effectivecloseness` - Effective Closeness;
+  - `linerank` - LineRank;
+  - `labelpropagation` - Label Propagation;
+  - `slpa` - Speaker-Listener Label Propagation 
+- algorithm specific parameters:
+  - for Pagerank:
+    - `--pr_threshold`: execute the algorithm until the value changes in the vertices are at most the given value
+    - `--pr_sourceField`: the attribute of vertices to read the initial rank value from
+  - for SSSP:
+    - `--sssp_source`: the vertex ID to calculate distances to/from
+    - `--sssp_resultField`: the vertex attribute to write the result to
+  - for other algorithms: not implemented yet
+  
+# Running a Benchmark with Graphalytics Graphs
+The corresponding script is a wrapper that downloads a graph file (if it does not find it locally) into the current 
+directory, imports the graph into the database and runs a Pregel algorithm on it. It accepts all 
+[Pregel parameters](#Running-Pregel) and in addition
+- `--remove_archive`: remove the downloaded arcive file after extracting all files from it
+- `--target_directory`: the directory to download and extract the files
+- `dataset`: a positional (necessary) parameter which can be one of 
+```commandline
+cit-Patents, com-friendster, datagen-7_5-fb, datagen-7_6-fb, datagen-7_7-zf, datagen-7_8-zf, 
+datagen-7_9-fb, datagen-8_0-fb, datagen-8_1-fb, datagen-8_2-zf, datagen-8_3-zf, datagen-8_4-fb,
+datagen-8_5-fb, datagen-8_6-fb, datagen-8_7-zf, datagen-8_8-zf, datagen-8_9-fb, datagen-9_0-fb,
+datagen-9_1-fb, datagen-9_2-zf, datagen-9_3-zf, datagen-9_4-fb, datagen-sf3k-fb, dota-league, 
+example-directed, example-undirected, graph500-22, graph500-23, graph500-24, graph500-25, 
+graph500-26, graph500-27, graph500-28, graph500-29, kgs, twitter_mpi
+```
+

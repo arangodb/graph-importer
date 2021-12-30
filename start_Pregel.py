@@ -17,48 +17,15 @@ def get_arguments():
     # general
     make_global_parameters(parser)
 
-    parser.add_argument('--sleep_time', type=int, default=1000, help='Time in seconds to wait before requesting '
-                                                                     'the status of the Pregel program again.')
     make_database_input_parameters(parser)
     make_pregel_parameters(parser)
-
-    # pagerank
-    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
-                                                        pagerank - Page Rank; 
-                                                        sssp - Single-Source Shortest Path; 
-                                                        connectedcomponents - Connected Components;
-                                                        wcc - Weakly Connected Components;
-                                                        scc - Strongly Connected Components;
-                                                        hits - Hyperlink-Induced Topic Search;
-                                                        effectivecloseness - Effective Closeness;
-                                                        linerank - LineRank;
-                                                        labelpropagation - Label Propagation;
-                                                        slpa - Speaker-Listener Label Propagation''',
-                        choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
-                                 'linerank', 'labelpropagation', 'slpa'])
-
-    parser.add_argument('--pr_threshold', type=float,
-                        help='If \'algorithm\' is \'pagerank\', execute until the value changes in the vertices '
-                             'are at most pr_threshold. Otherwise ignored.')
-    parser.add_argument('--pr_sourceField', type=str,
-                        help='If \'algorithm\' is \'pagerank\', the attribute of vertices to read the initial '
-                             'rank value from. Otherwise ignored.')
-
-    # sssp
-    parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
-                                              ' Otherwise ignored.')
-    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'pagerank\', the vertex ID to calculate '
-                                                   'distance. Otherwise ignored.')
 
     arguments = parser.parse_args()
 
     return arguments
 
 
-def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str,
-                          vertexCollections: Optional[List[str]] = None,
-                          edgeCollections: Optional[List[str]] = None,
-                          params: Optional[dict] = None):
+def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str, params: Optional[dict] = None):
     """
     Call a Pregel algorithm. If graph_name is not None, vertexCollections and edgeCollections are ignored.
     """
@@ -67,9 +34,6 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str,
     json_ = {"algorithm": algorithm_name}
     if db_info.graph_name:
         json_['graphName'] = db_info.graph_name
-    else:
-        json_['vertexCollections'] = vertexCollections
-        json_['edgeCollections'] = edgeCollections
 
     response = requests.post(url, json=json_, params=params, auth=(db_info.username, db_info.password))
     if response.status_code == 400:
@@ -208,8 +172,7 @@ if __name__ == "__main__":
         if args.pr_sourceField:
             params['sourceField'] = args.pr_sourceField
 
-        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
-                                             args.vertex_collection_name, params).strip('"')
+        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', params).strip('"')
         print_pregel_status(db_info, algorithm_id, args.sleep_time)
     # sssp
     if args.algorithm == 'sssp':
