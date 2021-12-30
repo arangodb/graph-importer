@@ -35,7 +35,10 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str, params: Op
     if db_info.graph_name:
         json_['graphName'] = db_info.graph_name
 
-    response = requests.post(url, json=json_, params=params, auth=(db_info.username, db_info.password))
+    if params:
+        json_['params'] = params
+
+    response = requests.post(url, json=json_, auth=(db_info.username, db_info.password))
     if response.status_code == 400:
         reason = 'the set of collections for the Pregel job includes a system collection, ' \
                  'or the collections do not conform to the sharding requirements for Pregel jobs.'
