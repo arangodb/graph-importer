@@ -52,14 +52,14 @@ SMALL_DATASOUCES = {'cit-Patents': 'https://surfdrive.surf.nl/files/index.php/s/
                     'twitter_mpi': 'https://surfdrive.surf.nl/files/index.php/s/keuUstVmhPAIW3A/download',
                     'wiki-Talk': 'https://surfdrive.surf.nl/files/index.php/s/c5dT1fwzXaNHT8j/download'}
 
-BIG_DATASOURCES = {'datagen-sf10k-fb': ['https://surfdrive.surf.nl/files/index.php/s/mQpAeUD4HIdh88R/download',
-                                        'https://surfdrive.surf.nl/files/index.php/s/bLthhT3tQytnlM0/download'
-                                        ],
-                   'graph500-30': ['https://surfdrive.surf.nl/files/index.php/s/07HY4YvhsFp3awr/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/QMy60s36HBYXliD/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/K0SsxPKogKZu86P/download',
-                                   'https://surfdrive.surf.nl/files/index.php/s/E5ZgpdUyDxVMP9O/download'
-                                   ]}
+BIG_DATASOURCES = {} #{'datagen-sf10k-fb': ['https://surfdrive.surf.nl/files/index.php/s/mQpAeUD4HIdh88R/download',
+#                                         'https://surfdrive.surf.nl/files/index.php/s/bLthhT3tQytnlM0/download'
+#                                         ],
+#                    'graph500-30': ['https://surfdrive.surf.nl/files/index.php/s/07HY4YvhsFp3awr/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/QMy60s36HBYXliD/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/K0SsxPKogKZu86P/download',
+#                                    'https://surfdrive.surf.nl/files/index.php/s/E5ZgpdUyDxVMP9O/download'
+#                                    ]}
 
 ALL_DATASOUCES_NAMES = list(SMALL_DATASOUCES.keys()) + list(BIG_DATASOURCES.keys())
 
@@ -67,18 +67,13 @@ ALL_DATASOUCES_NAMES = list(SMALL_DATASOUCES.keys()) + list(BIG_DATASOURCES.keys
 def get_arguments():
     parser = argparse.ArgumentParser(description='Import a graph from a file/files to ArangoDB.')
 
+    # global
     make_global_parameters(parser)
     make_database_parameters(parser)
     make_pregel_parameters(parser)
 
-    parser.add_argument('--overwrite_file', action='store_true',  # default: False
-                        help='Whether to overwrite the file if it exists.')
-    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
-                                                                  'the status of the Pregel program again.')
     parser.add_argument('--remove_archive', action='store_true',  # default: False
                         help='Whether to remove the archive file.')
-    parser.add_argument('--remove_graph_files', action='store_true',  # default: False
-                        help='Whether to remove the graph files file extracted from the archive.')
     parser.add_argument('--target_directory', action='store_true',  # default: False
                         help='The directory to extract downloaded files.')
     parser.add_argument('dataset', choices=ALL_DATASOUCES_NAMES + ['all'],
@@ -193,9 +188,7 @@ if __name__ == "__main__":
         if args.pr_sourceField:
             params['sourceField'] = args.pr_sourceField
 
-        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
-                                             args.vertex_collection_name,
-                                             params).strip('"')
+        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', params).strip('"')
         print_pregel_status(db_info, algorithm_id, args.sleep_time)
 
     # print statistics

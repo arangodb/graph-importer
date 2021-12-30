@@ -128,17 +128,23 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--useMemoryMaps', action='store_true',  # default: False
                         help='Whether to use disk based files to store temporary results.')
     parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
-    parser.add_argument('algorithm', help='''The name of the Gregel algorithm, one of:
-                                                        pagerank - Page Rank; 
-                                                        sssp - Single-Source Shortest Path; 
-                                                        connectedcomponents - Connected Components;
-                                                        wcc - Weakly Connected Components;
-                                                        scc - Strongly Connected Components;
-                                                        hits - Hyperlink-Induced Topic Search;
-                                                        effectivecloseness - Effective Closeness;
-                                                        linerank - LineRank;
-                                                        labelpropagation - Label Propagation;
-                                                        slpa - Speaker-Listener Label Propagation''',
+
+    # Pregel watching
+    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
+                                                                     'the status of the Pregel program again.')
+
+    # the algorithm
+    parser.add_argument('algorithm', help='''The name of the Pregel algorithm, one of:
+                                             pagerank - Page Rank; 
+                                             sssp - Single-Source Shortest Path; 
+                                             connectedcomponents - Connected Components;
+                                             wcc - Weakly Connected Components;
+                                             scc - Strongly Connected Components;
+                                             hits - Hyperlink-Induced Topic Search;
+                                             effectivecloseness - Effective Closeness;
+                                             linerank - LineRank;
+                                             labelpropagation - Label Propagation;
+                                             slpa - Speaker-Listener Label Propagation''',
                         choices=['pagerank', 'sssp', 'connectedcomponents', 'wcc', 'scc', 'hits', 'effectivecloseness',
                                  'linerank', 'labelpropagation', 'slpa'])
     # pagerank
@@ -152,5 +158,7 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     # sssp
     parser.add_argument('--sssp_source', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate distances.'
                                               ' Otherwise ignored.')
-    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'pagerank\', the vertex ID to calculate '
+    parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate '
                                                    'distance. Otherwise ignored.')
+                        help='Execute until the value changes in the vertices are at most the threshold.')
+

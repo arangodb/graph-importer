@@ -17,8 +17,6 @@ def get_arguments():
     # general
     make_global_parameters(parser)
 
-    parser.add_argument('--sleep_time', type=int, default=1000, help='Time in seconds to wait before requesting '
-                                                                     'the status of the Pregel program again.')
     make_database_input_parameters(parser)
     make_pregel_parameters(parser)
 
@@ -26,10 +24,7 @@ def get_arguments():
     return arguments
 
 
-def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str,
-                          vertexCollections: Optional[List[str]] = None,
-                          edgeCollections: Optional[List[str]] = None,
-                          params: Optional[dict] = None):
+def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str, params: Optional[dict] = None):
     """
     Call a Pregel algorithm. If graph_name is not None, vertexCollections and edgeCollections are ignored.
     """
@@ -38,11 +33,11 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str,
     json_ = {"algorithm": algorithm_name}
     if db_info.graph_name:
         json_['graphName'] = db_info.graph_name
-    else:
-        json_['vertexCollections'] = vertexCollections
-        json_['edgeCollections'] = edgeCollections
 
-    response = requests.post(url, json=json_, params=params, auth=(db_info.username, db_info.password))
+    if params:
+        json_['params'] = params
+
+    response = requests.post(url, json=json_, auth=(db_info.username, db_info.password))
     if response.status_code == 400:
         reason = 'the set of collections for the Pregel job includes a system collection, ' \
                  'or the collections do not conform to the sharding requirements for Pregel jobs.'
