@@ -5,6 +5,9 @@ let
   python-with-my-packages = my-python.withPackages (p: with p; [
     requests
     # other python packages you want
+    zstandard
+    tqdm
+    psutil
   ]);
 in
 pkgs.mkShell {

@@ -179,12 +179,13 @@ if __name__ == "__main__":
         if args.pr_sourceField:
             params['sourceField'] = args.pr_sourceField
 
-        algorithm_id = call_pregel_algorithm(db_info, 'pagerank', args.edge_collection_name,
-                                             args.vertex_collection_name, params).strip('"')
-        print_pregel_status(db_info, algorithm_id, args.sleep_time)
     # sssp
     if args.algorithm == 'sssp':
         if args.sssp_source:
             params['source'] = args.sssp_source
         if args.sssp_resultField:
             params['_resultField'] = args.sssp_resultField
+
+    algorithm_id = call_pregel_algorithm(db_info, args.algorithm, params).strip('"')
+    print_pregel_status(db_info, algorithm_id, args.sleep_time)
+ 
