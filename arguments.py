@@ -160,5 +160,4 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
                                               ' Otherwise ignored.')
     parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate '
                                                    'distance. Otherwise ignored.')
-                        help='Execute until the value changes in the vertices are at most the threshold.')
 
