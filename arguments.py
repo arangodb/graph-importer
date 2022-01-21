@@ -112,6 +112,18 @@ def make_importer_files_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--edges_file_edge_list', default='graph.txt', type=str, nargs='?',
                         help='For graphs given by an edge list, the file containing the edges.')
 
+def make_pregel_watch_parameters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
+                                                                  'the status of the Pregel program again.')
+    parser.add_argument('--extended_info', action='store_true',  # default: False
+                        help='Show extended information (in addition to the official API.)')
+    parser.add_argument('--no_watch', action='store_true',  # default: False
+                        help='Regularly print the status of the Pregel run.')
+    parser.add_argument('--max_num_states', type=int, default=10000000,  # there is no inf for int in pyhton3
+                        help='Maximum number of states to be qeueried and printed.')
+    parser.add_argument('--algorithm_id', type=int,
+                        help='For watching a Pregel run without starting it, the algorithm id.')
+
 
 def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--store', action='store_true',  # default: False
@@ -130,8 +142,7 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--shardKeyAttribute', help='The shard key that edge collections are sharded after.')
 
     # Pregel watching
-    parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
-                                                                     'the status of the Pregel program again.')
+    make_pregel_watch_parameters(parser)
 
     # the algorithm
     parser.add_argument('algorithm', help='''The name of the Pregel algorithm, one of:

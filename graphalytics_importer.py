@@ -164,6 +164,7 @@ def import_graphalytics(db_info: DatabaseInfo, vertices_filename, edges_filename
     :param bulk_size: the num_vertices of bulks
     :return: None
     """
+
     if graph_exists(db_info) and not db_info.overwrite:
         if be_verbose:
             print('The graph exists already, using it.')

@@ -3,11 +3,12 @@ import argparse
 import json
 import os
 from time import sleep
-from typing import List, Optional
+from typing import Optional
 
 import requests
 
 from arguments import make_global_parameters, make_database_input_parameters, make_pregel_parameters
+from general import arangodIsRunning
 from helper_classes import DatabaseInfo
 
 
@@ -56,7 +57,7 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str, params: Op
     return response.text
 
 
-def get_pregel_exec_status(db_info: DatabaseInfo, algorithm_id: str):
+def get_pregel_exec_status(db_info: DatabaseInfo, algorithm_id: str, extended_info: bool):
     """
     Returns the status (result) of the algorithm execution by its id.
     :param db_info:
@@ -64,6 +65,11 @@ def get_pregel_exec_status(db_info: DatabaseInfo, algorithm_id: str):
     :return:
     """
     url = os.path.join(db_info.endpoint, f'_api/control_pregel/{algorithm_id}')
+    if extended_info:
+        url = os.path.join(db_info.endpoint, f'_api/control_pregel/{algorithm_id}/?extended=true')
+    else:
+        url = os.path.join(db_info.endpoint, f'_api/control_pregel/{algorithm_id}')
+
     response = requests.get(url, auth=(db_info.username, db_info.password))
 
     if response.status_code != 200:
@@ -75,24 +81,17 @@ def get_pregel_exec_status(db_info: DatabaseInfo, algorithm_id: str):
 
 
 def get_width(key: str) -> int:
-    if key == 'state':
-        return 25
-    elif key == 'aggregators':
-        return 35
-    elif key == 'computationTime':
-        return 20
-    else:
-        return 15
+    map = {'state': 10, 'gss': 4, 'totalRuntime': 13, 'aggregators': 35, 'computationTime': 10, 'startupTime': 10,
+           'storageTime': 10}
+    if key in map:
+        return map[key]
+    return 15
 
 
 def print_pregel_status_variable(d: json) -> None:
     information = ''
     for key, value in d.items():
-        if key in [
-                # these values are always the same:
-                'id', 'database', 'algorithm', 'created', 'ttl',
-                # these values seem to appear only when 'state' == 'done'
-                'expires', 'storageTime', 'vertexCount', 'edgeCount']:
+        if key in FIELDS_BEFORE_TABLE or key in FIELDS_AFTER_TABLE:
             continue
         if type(value) == float:
             val = f'{value:.5f}'
@@ -104,40 +103,62 @@ def print_pregel_status_variable(d: json) -> None:
         else:
             val = str(value)
 
-        information += f'{val:<{get_width(key)}}'
+        information += f'{val:<{max(len(val), get_width(key))}}'
 
     print(f'{information:15}')
 
 
-def print_pregel_status(db_info: DatabaseInfo, algorithm_id: str, sleep_time: float):
-    status = get_pregel_exec_status(db_info, algorithm_id)
+def short(key: str):
+    map = {'aggregators': "aggr's", 'computationTime': 'comptT', 'sendCount': '#sentMsg', 'receivedCount': '#gotMsg',
+           'startupTime': 'loadT', 'storageTime': 'storeT'}
+    if key in map:
+        return map[key]
+    return key
+
+
+FIELDS_BEFORE_TABLE = ['id', 'database', 'algorithm', 'created', 'ttl']
+FIELDS_AFTER_TABLE = ['expires', 'storageTime', 'vertexCount', 'edgeCount', 'totalRuntime']
+
+
+def print_pregel_status(db_info: DatabaseInfo, algorithm_id: str, sleep_time: float, extended_info: bool = False,
+                        max_num_states: int = 10000000):
+    if (max_num_states == 0):
+        return
+    num_states = 1
+    status = get_pregel_exec_status(db_info, algorithm_id, extended_info)
     if status.status_code == 200:
         d = json.loads(status.text.strip('"'))
+
+        # print fields before table
         print(f'id: {d["id"]}')
         print(f'database: {d["database"]}')
         print(f'algorithm: {d["algorithm"]}')
         print(f'created: {d["created"]}')
         print(f'ttl: {d["ttl"]}')
         print()
+
         # print column names
         first_line = ''
         for key, value in d.items():
-            if key in ['id', 'database', 'algorithm', 'created', 'ttl']:
+            if key in FIELDS_BEFORE_TABLE or key in FIELDS_AFTER_TABLE:
                 continue
-            first_line += f'{key:<{get_width(key)}}'
+            first_line += f'{short(key):<{get_width(key)}}'
         print(first_line + '\n')
     else:
         raise RuntimeError(f'Pregel returned error. Error code: {status.status_code}. Message: {status.text}')
 
-    while d['state'] == 'running' or d['state'] == 'storing' or d['state'] == 'recovering':
+    # print table data
+    while num_states <= max_num_states and d['state'] == 'running' or d['state'] == 'storing' or d[
+        'state'] == 'recovering':
         sleep(sleep_time)
         print_pregel_status_variable(d)
-        status = get_pregel_exec_status(db_info, algorithm_id)
+        num_states += 1
+        status = get_pregel_exec_status(db_info, algorithm_id, extended_info)
         d = json.loads(status.text.strip('"'))
     print_pregel_status_variable(d)
     print()
     for key, value in d.items():
-        if key in ['expires', 'storageTime', 'vertexCount', 'edgeCount']:
+        if key in FIELDS_AFTER_TABLE:
             print(f'{key}: {value}')
 
     exit(0)
@@ -148,6 +169,9 @@ if __name__ == "__main__":
 
     db_info = DatabaseInfo(args.endpoint, args.graphname,
                            isSmart=True, username=args.user, password=args.pwd)
+
+    if not arangodIsRunning():
+        raise RuntimeError('The process "arangod" is not running, please, run it first.')
 
     params = dict()
 
@@ -182,5 +206,7 @@ if __name__ == "__main__":
             params['_resultField'] = args.sssp_resultField
 
     algorithm_id = call_pregel_algorithm(db_info, args.algorithm, params).strip('"')
-    print_pregel_status(db_info, algorithm_id, args.sleep_time)
- 
+    if not args.silent:
+        print(f'Pregel algorithm with id {algorithm_id} started.')
+    if not args.no_watch:
+        print_pregel_status(db_info, algorithm_id, args.sleep_time, args.extended_info, args.max_num_states)

@@ -9,7 +9,7 @@ import zstandard
 from tqdm import tqdm
 
 from arguments import make_global_parameters, make_database_parameters, make_pregel_parameters
-from general import get_time_difference_string
+from general import get_time_difference_string, arangodIsRunning
 from graphalytics_importer import import_graphalytics, import_graphalytics_get_files
 from helper_classes import DatabaseInfo
 from start_Pregel import call_pregel_algorithm, print_pregel_status
@@ -129,6 +129,15 @@ if __name__ == "__main__":
     dataset = args.dataset
     target_directory = args.target_directory + os.sep + dataset if args.target_directory else dataset
 
+    # prepare data structures
+    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
+                           args.edge_collection_name, True,
+                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
+                           '', 'weight', args.user, args.pwd)
+
+    if not arangodIsRunning():
+        raise RuntimeError('The process "arangod" is not running, please, run it first.')
+
     #   parameters for Pregel
     params = dict()
     if args.store:
@@ -169,12 +178,6 @@ if __name__ == "__main__":
     # find graphalytics files
     vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
 
-    # prepare data structures
-    db_info = DatabaseInfo(args.endpoint, args.graphname, args.vertex_collection_name,
-                           args.edge_collection_name, True,
-                           args.repl_factor, args.num_shards, args.overwrite, args.smart_attribute,
-                           '', 'weight', args.user, args.pwd)
-
     # import
     start = time.monotonic()
     import_graphalytics(db_info, vertices_filename, edges_filename, properties_filename, args.bulk_size,
@@ -189,7 +192,10 @@ if __name__ == "__main__":
             params['sourceField'] = args.pr_sourceField
 
         algorithm_id = call_pregel_algorithm(db_info, 'pagerank', params).strip('"')
-        print_pregel_status(db_info, algorithm_id, args.sleep_time)
+        if not args.silent:
+            print(f'Pregel algorithm with id {algorithm_id} started.')
+        if not args.no_watch:
+            print_pregel_status(db_info, algorithm_id, args.sleep_time, args.extended_info, args.max_num_states)
 
     # print statistics
     if not args.silent:
