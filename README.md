@@ -37,7 +37,7 @@ python importer.py --endpoint http://localhost:8529/_db/_system edge-list --edge
 - generate a clique (only one direction for every undirected edge):
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system clique 
+python generator.py --endpoint http://localhost:8529/_db/_system clique 
     --num_vertices 1000 --graphname Clique --vertex_collection_name cliqueVertices --edge_collection_name cliqueEdges 
     --overwrite --vertex_property_type random 
     --vertex_property 0.1 0.9 --edge_property_type random --edge_property 0.2 0.8
@@ -53,7 +53,7 @@ The vertices will have a random number between 0.1 and 0.9 as an attribute, the 
     - an edge between two connected cliques exists with probability 0.3:
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system cliques-graph 
+python generator.py --endpoint http://localhost:8529/_db/_system cliques-graph 
     --num_cliques 100 --min_size_clique 12 --max_size_clique 12 
     --prob_missing_one 0.4 --prob_missing_all 0.7 --density_between_two_cliques 0.3
 ```
@@ -62,7 +62,7 @@ python generator.py http://localhost:8529/_db/_system cliques-graph
   smart with smart attribute `part`
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system k-partite 
+python generator.py --endpoint http://localhost:8529/_db/_system k-partite 
     --num_parts 20 --min_size_clique 30 --max_size_clique 35 
     --make_smart --smart_attribute part --overwrite
 ```
