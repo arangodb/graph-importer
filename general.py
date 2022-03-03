@@ -12,9 +12,12 @@ from helper_classes import DatabaseInfo
 
 def graph_exists(db_info: DatabaseInfo) -> bool:
     url = os.path.join(db_info.endpoint, f'_api/gharial/{db_info.graph_name}')
-    response = requests.get(url, auth=(db_info.username, db_info.password))
-    return response.status_code == 200
-
+    try:
+        response = requests.get(url, auth=(db_info.username, db_info.password))
+        return response.status_code == 200
+    except RuntimeError:
+        print("Error: database connection failed.")
+    return False
 
 def collection_exists(db_info: DatabaseInfo, collection_name: str) -> bool:
     url = os.path.join(db_info.endpoint, f'_api/collection/{collection_name}')
