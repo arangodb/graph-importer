@@ -1,45 +1,30 @@
 # Graph Importer
 
-This repository contains command line Python scripts to import graphs from external sources as files into a running
-instance of `arangod`
-and to generate graphs in a running instance.
+This repository contains command line Python scripts to 
+- import graphs from external sources as files into a running instance of `arangod`, 
+- generate graphs in a running instance and
+- run a Pregel algorithm on a graph.
 
-# TL;DR:
+## Usage Examples
 
-- run the Pregel PageRank program on graph `generatedGraph`, write the result into the field `res_field`,
-update status every `5` seconds, run until value change is at most `0.00001`:
-```commandline
-python start_Pregel.py --endpoint http://localhost:8529/ --graphname generatedGraph 
-    --resultField res_field 
-    --sleep_time 5 --pr_threshold 0.00001 pagerank
-```
-
-- download the `cit-Patents` dataset from the Graphalytics website, import the graph and 
-run Pregel PageRank until value change is at most `0.00001`:
-```commandline
-python benchmark_graphalytics.py --endpoint http://localhost:8529/ pagerank cit-Patents 
-     --pr_threshold 0.00001
-```
-
-
-- importing a Graphalytics graph:
+- Import a Graphalytics graph:
 
 ```commandline
 python importer.py --endpoint http://localhost:8529/_db/_system graphalytics --dir_graphalytics /PATH/GRAPH_DIRECTORY 
 ```
 
-- importing a graph saved as a list of edges:
+- Import a graph saved as a list of edges:
 
 ```commandline
 python importer.py --endpoint http://localhost:8529/_db/_system edge-list --edges_file_edge_list /PATH/GRAPH_FILE 
 ```
 
-- generate a clique (only one direction for every undirected edge):
+- Generate a clique (only one direction for every undirected edge):
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system clique 
-    --num_vertices 1000 --graphname Clique --vertex_collection_name cliqueVertices --edge_collection_name cliqueEdges 
-    --overwrite --vertex_property_type random 
+python generator.py --endpoint http://localhost:8529/_db/_system clique \
+    --num_vertices 1000 --graphname Clique --vertex_collection_name cliqueVertices --edge_collection_name cliqueEdges \
+    --overwrite --vertex_property_type random \
     --vertex_property 0.1 0.9 --edge_property_type random --edge_property 0.2 0.8
 ```
 
@@ -47,33 +32,49 @@ This will create a clique graph on 1000 vertices in the database. The vertex col
 edge collection `cliqueEdges`, the graph itself `Clique`. Any existing object with the same name will be overwritten.
 The vertices will have a random number between 0.1 and 0.9 as an attribute, the edges - between 0.2 and 0.8.
 
-- Generating a "cliques-graph": a dijoint union of 100 cliques such that
+- Generate a "cliques-graph": a dijoint union of 100 cliques such that
     - in a clique, an edge is missing with probability 0.4;
     - any two cliques are connected with probability 0.7;
     - an edge between two connected cliques exists with probability 0.3:
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system cliques-graph 
-    --num_cliques 100 --min_size_clique 12 --max_size_clique 12 
-    --prob_missing_one 0.4 --prob_missing_all 0.7 --density_between_two_cliques 0.3
+python generator.py --endpoint http://localhost:8529/_db/_system cliques-graph  \
+    --num_cliques 100 --min_size_clique 12 --max_size_clique 12 \
+    --prob_missing_one 0.4 --prob_missing_all 0.7 --density_between_two_cliques 0.3 
 ```
 
-- Generating the 20-partite complete graph with parts of random size between 30 and 35. The constructed graph will be
+- Generate the 20-partite complete graph with parts of random size between 30 and 35. The constructed graph will be
   smart with smart attribute `part`
 
 ```commandline
-python generator.py http://localhost:8529/_db/_system k-partite 
-    --num_parts 20 --min_size_clique 30 --max_size_clique 35 
+python generator.py --endpoint http://localhost:8529/_db/_system k-partite \
+    --num_parts 20 --min_size_clique 30 --max_size_clique 35 \
     --make_smart --smart_attribute part --overwrite
 ```
 
-# Importing Graphs
+- Run the Pregel PageRank program on graph `generatedGraph`, write the result into the field `res_field`,
+update status every `5` seconds, run until value change is at most `0.00001`:
+```commandline
+python start_Pregel.py --endpoint http://localhost:8529/ --graphname generatedGraph \
+    --resultField res_field \
+    --sleep_time 5 --pr_threshold 0.00001 pagerank
+```
+
+- Download the `cit-Patents` dataset from the Graphalytics website, import the graph and 
+run Pregel PageRank until value change is at most `0.00001`:
+```commandline
+python benchmark_graphalytics.py --endpoint http://localhost:8529/ pagerank cit-Patents \
+     --pr_threshold 0.00001
+```
+
+## Usage
+### Importing Graphs
 
 The graphs must be stored in local files. Two formats are accepted: graphs from the
 [Graphalytics repository](https://graphalytics.org/) and graphs saved in one file as a list of edges, possiblly with
 weights. In the following we describe the accepted formats. It is expected that the files are well-formed.
 
-## Graphalytics Format
+#### Graphalytics Format
 
 A Graphalytics graph is stored in multiple files. Our script uses only two of them:
 
@@ -95,12 +96,12 @@ A Graphalytics graph is stored in multiple files. Our script uses only two of th
     43 321 43.2
   ```
 
-## Edge list format
+#### Edge list format
 
 A graph is stored in a single file that has the same format as the edge files in Graphalytics format except that it may
 contain comment lines starting with `#`, `%` or `/` and the weighs are any sequences of characters without whitespaces.
 
-## How to import
+#### How to import
 
 The import script is `importer.py`. You can call with the option `-h` to obtain detailed information on its options that
 we describe here as well. The examples are given for a *nix system.
@@ -156,7 +157,7 @@ we describe here as well. The examples are given for a *nix system.
 - verbosity:
     - `-- silent`: do not print time statistics, progress bar and what is being currently done, default is `False`
 
-# Generating Graphs
+### Generating Graphs
 
 The script name is `generator.py`. It can create two types of graphs: undirected cliques and the cliques graphs. An
 undirected clique is a graph where every vertex has an edge to every other vertex and, possibly, self-loops. A cliques
@@ -170,7 +171,7 @@ subgraph. The idea is that if `prob_missing` is very low, the resulting subgraph
 a clique.) Replace edges `(v,w)` by `num_edges_between_cliques(|V_v|, |V_w|)` edges between the cliques, choosing
 endpoints in the cliques randomly with equal distribution.
 
-## How to Generate
+#### How to Generate
 
 The script `generator.py` has at least two arguments:
 
@@ -231,7 +232,7 @@ The script `generator.py` has at least two arguments:
       s2, '
       'and there are m edges between the two cliques, the density is m/(s1*s2).
 
-# Running Pregel
+### Running Pregel
 It is possible to start a Pregel algorithm and to observe its progress while it is working.
 The script is `start_Pregel.py`, which can be called with the following parameters. 
 - `--endpoint`: the server address, e.g., `http://localhost:8529/_db/_system`
@@ -262,7 +263,7 @@ The script is `start_Pregel.py`, which can be called with the following paramete
     - `--sssp_resultField`: the vertex attribute to write the result to
   - for other algorithms: not implemented yet
   
-# Running a Benchmark with Graphalytics Graphs
+### Running a Benchmark with Graphalytics Graphs
 The corresponding script is a wrapper that downloads a graph file (if it does not find it locally) into the current 
 directory, imports the graph into the database and runs a Pregel algorithm on it. It accepts all 
 [Pregel parameters](#Running-Pregel) and in addition
@@ -278,3 +279,5 @@ example-directed, example-undirected, graph500-22, graph500-23, graph500-24, gra
 graph500-26, graph500-27, graph500-28, graph500-29, kgs, twitter_mpi
 ```
 
+## Installation
+You need python3 and all python packages listed in requirements.txt
