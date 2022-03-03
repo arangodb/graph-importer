@@ -9,15 +9,26 @@ def make_global_parameters(parser: argparse.ArgumentParser) -> None:
                         help='Print progress and statistics.')
 
 
+def database_parameters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
+    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
+    parser.add_argument('--graphname', default='generatedGraph', help='Name of the new graph in the database.')
+
+
+def database_mult_collections(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--vertex_collections', type=str, nargs='+',
+                        help='Names of the vertex collections in the database (separator: space).')
+    parser.add_argument('--edge_collections', type=str, nargs='+',
+                        help='Names of the edge collections in the database (separator: space).')
+
+
 def make_database_input_parameters(parser: argparse.ArgumentParser) -> None:
     """
     Make database parameters necessary to use an existing graph.
     :param parser: the parser to add parameters
     :return: None
     """
-    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
-    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
-    parser.add_argument('--graphname', default='generatedGraph', help='Name of the new graph in the database.')
+    database_parameters(parser)
     parser.add_argument('--edge_collection_name', default='e', help='Name of the new edge collection in the database.')
     parser.add_argument('--vertex_collection_name', default='v', help='Name of the new vertex collection'
                                                                       ' in the database.')
@@ -112,6 +123,7 @@ def make_importer_files_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--edges_file_edge_list', default='graph.txt', type=str, nargs='?',
                         help='For graphs given by an edge list, the file containing the edges.')
 
+
 def make_pregel_watch_parameters(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('--sleep_time', type=int, default=1, help='Time in seconds to wait before requesting '
                                                                   'the status of the Pregel program again.')
@@ -123,6 +135,22 @@ def make_pregel_watch_parameters(parser: argparse.ArgumentParser) -> None:
                         help='Maximum number of states to be qeueried and printed.')
     parser.add_argument('--algorithm_id', type=int,
                         help='For watching a Pregel run without starting it, the algorithm id.')
+
+
+def query_parameters(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument('--query_id', help='The query id.')
+    parser.add_argument('--vertex_properties', nargs='*',
+                        help='Vertex properties that should be loaded from vertex documents.')
+    parser.add_argument('--edge_properties', nargs='*',
+                        help='Edges properties that should be loaded from edge documents.')
+    parser.add_argument('--algorithm', help='The name of the algorithm.')
+    parser.add_argument('--capacity_property',
+                        help='The name of the field of edges containing the capacity (for MinCut).')
+    parser.add_argument('--default_capacity', type=float,
+                        help='Default capacity for edges (for MinCut).')
+    parser.add_argument('--source_vertex_id', help='The id of the source vertex (for MinCut).')
+    parser.add_argument('--target_vertex_id', help='The id of the target vertex (for MinCut).')
+
 
 
 def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
@@ -171,4 +199,3 @@ def make_pregel_parameters(parser: argparse.ArgumentParser) -> None:
                                               ' Otherwise ignored.')
     parser.add_argument('--sssp_resultField', help='If \'algorithm\' is \'sssp\', the vertex ID to calculate '
                                                    'distance. Otherwise ignored.')
-
