@@ -19,7 +19,11 @@ def get_arguments():
     # general
     make_global_parameters(parser)
 
-    database_parameters(parser)
+    # as in make_database_arguments, but graphname has no default value
+    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
+    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
+    parser.add_argument('--graphname', help='Name of the new graph in the database.')
+
     database_mult_collections(parser)
     query_parameters(parser)
 
@@ -28,11 +32,11 @@ def get_arguments():
 
 
 def make_query(db_info: DatabaseInfo, graph_spec: Union[dict, str], algorithm_spec: dict,
-               queryId: Optional[str] = None) -> bool:
+               query_id: Optional[str] = None) -> bool:
     """
     Create a Pregel3 query.
 
-    If queryId is given, Pregel3 tries to create a query with this id. If another query with this id already exists, a
+    If query_id is given, Pregel3 tries to create a query with this id. If another query with this id already exists, a
     warning is returned and no query is created. If no query id is passed, the new query obtains an automatically
     generated id.
 
@@ -43,8 +47,8 @@ def make_query(db_info: DatabaseInfo, graph_spec: Union[dict, str], algorithm_sp
     :return:
     """
     url = os.path.join(db_info.endpoint, "_api/pregel3/queries/")
-    if (queryId):
-        json_ = {"queryId": queryId, "algorithmSpec": algorithm_spec, "graphSpec": graph_spec}
+    if (query_id):
+        json_ = {"queryId": query_id, "algorithmSpec": algorithm_spec, "graphSpec": graph_spec}
     else:
         json_ = {"algorithmName": algorithm_spec, "graph_spec": graph_spec}
 
@@ -88,7 +92,7 @@ def call_pregel_algorithm(db_info: DatabaseInfo, algorithm_name: str, params: Op
 
 
 if __name__ == "__main__":
-    print("Starting")
+    print("Creating a query")
     args = get_arguments()
 
     db_info = DatabaseInfo(args.endpoint, args.graphname,
