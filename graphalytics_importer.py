@@ -167,7 +167,7 @@ def import_graphalytics(db_info: DatabaseInfo, vertices_filename, edges_filename
 
     if graph_exists(db_info) and not db_info.overwrite:
         if be_verbose:
-            print('The graph exists already, using it.')
+            print('The graph exists already, not importing it.')
         return
     else:
         create_graph(db_info)
