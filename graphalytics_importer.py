@@ -9,7 +9,7 @@ from helper_classes import DatabaseInfo
 from vertices_generator import ConverterToVertex
 
 
-def import_graphalytics_get_files(directory: str):
+def import_graphalytics_get_files_from_directory(directory: str):
     """
     Append to the directory the filename which is the suffix of directory after the last '/'
     (or just directory if no '/') and then append '.v', '.e' and '.properties' and return
@@ -21,6 +21,16 @@ def import_graphalytics_get_files(directory: str):
     graph_name = PurePath(directory).name
     return os.path.join(directory, graph_name + '.v'), os.path.join(directory, graph_name + '.e'), os.path.join(
         directory, graph_name + '.properties')
+
+
+def import_graphalytics_get_files_from_base_name(base_filename: str):
+    """
+    Append to base_filename '.v', '.e' and '.properties' and return
+    all three filenames as absolute paths.
+    :param base_filename: the base filename which is expected to be the common prefix of one Graphalytics graph.
+    :return: the three filenames
+    """
+    return base_filename + '.v', base_filename + '.e', base_filename + '.properties'
 
 
 def get_property_graphalytics(properties_filename: str, property_: str):
@@ -173,4 +183,3 @@ def import_graphalytics(db_info: DatabaseInfo, vertices_filename, edges_filename
         create_graph(db_info)
         read_and_create_vertices_graphalytics(vertices_filename, properties_filename, db_info, bulk_size, be_verbose)
         read_and_create_edges_graphalytics(edges_filename, properties_filename, db_info, bulk_size, be_verbose)
-

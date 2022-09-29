@@ -5,7 +5,7 @@ import time
 from arguments import make_global_parameters, make_database_parameters, make_importer_files_parameters
 from edge_list import import_edge_list
 from general import get_time_difference_string
-from graphalytics_importer import import_graphalytics_get_files, import_graphalytics
+from graphalytics_importer import import_graphalytics_get_files_from_directory, import_graphalytics
 from helper_classes import DatabaseInfo, GraphInfo, VertexOrEdgeProperty
 
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     if args.sourcetype == 'graphalytics':
         if args.dir_graphalytics:
-            vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(
+            vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files_from_directory(
                 args.dir_graphalytics)
         else:
             vertices_filename = args.vertices_file_graphalytics

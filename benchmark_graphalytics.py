@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 from arguments import make_global_parameters, make_database_parameters, make_pregel_parameters
 from general import get_time_difference_string, arangodIsRunning
-from graphalytics_importer import import_graphalytics, import_graphalytics_get_files
+from graphalytics_importer import import_graphalytics, import_graphalytics_get_files_from_directory
 from helper_classes import DatabaseInfo
 from start_Pregel import call_pregel_algorithm, print_pregel_status
 
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     tar_file.extractall(target_directory)
 
     # find graphalytics files
-    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files(target_directory)
+    vertices_filename, edges_filename, properties_filename = import_graphalytics_get_files_from_directory(target_directory)
 
     # import
     start = time.monotonic()
