@@ -16,40 +16,33 @@ from helper_classes import DatabaseInfo
 def get_arguments():
     parser = argparse.ArgumentParser(description='Call a Pregel3 algorithm on the given graph in the given database.')
 
-    # general
-    make_global_parameters(parser)
-
-    database_parameters(parser)
-    parser.add_argument('--query_id', help='The query id.')
+    parser.add_argument('--endpoint', required=True, help='Endpoint, e.g. http://localhost:8529/_db/_system')
+    parser.add_argument('--user', nargs='?', default='root', help='User name for the server.')
+    parser.add_argument('--pwd', nargs='?', default='', help='Password for the server.')
 
     arguments = parser.parse_args()
     return arguments
 
 
-def load_graph(db_info: DatabaseInfo, query_id: str) -> bool:
+def get_all_queries(endpoint: str, username: str, password: str):
     """
-    Load a graph with the given query_id. If no query with query_id exists, an error is returned.
+    Gets all query ids.
     """
-    url = os.path.join(db_info.endpoint, "_api/pregel3/queries/" + query_id + "/loadGraph");
+    url = os.path.join(endpoint, "_api/pregel3/queries")
 
-    response = requests.get(url, auth=(db_info.username, db_info.password))
+    response = requests.get(url, auth=(username, password))
     if response.status_code != 200:
         print(json.loads(response.content)['errorMessage'])
         return False
+    print(json.loads(response.content)['result'])
     return True
 
 
 if __name__ == "__main__":
-    print("Start loading graph")
+    print("Getting all query ids.")
     args = get_arguments()
-
-    db_info = DatabaseInfo(args.endpoint, args.graphname,
-                           isSmart=True, username=args.user, password=args.pwd)
 
     if not arangodIsRunning():
         raise RuntimeError('The process "arangod" is not running, please, run it first.')
 
-    query_id = args.query_id
-
-    if load_graph(db_info, query_id):
-        print("Graph loaded")
+    get_all_queries(args.endpoint, args.user, args.pwd)

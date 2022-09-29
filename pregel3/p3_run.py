@@ -25,17 +25,17 @@ def get_arguments():
     return arguments
 
 
-def get_status(endpoint: str, user: str, passw: str, query_id: str) -> None:
+def get_status(endpoint: str, user: str, passw: str, query_id: str) -> str:
     """
-    Return the status of the wuery with the given query_id. If no query with query_id exists, an error is returned.
+    Return the status of the query with the given query_id. If no query with query_id exists, an error is returned.
     """
-    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id)
+    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id + "/run")
 
     response = requests.get(url, auth=(user, passw))
     if response.status_code != 200:
-        print(json.loads(response.content)['errorMessage'])
+        return json.loads(response.content)['errorMessage']
     else:
-        print(json.loads(response.content)['result']['state'])
+        return json.loads(response.content)['result']['state']
 
 
 if __name__ == "__main__":
@@ -50,4 +50,4 @@ if __name__ == "__main__":
     if not arangodIsRunning():
         raise RuntimeError('The process "arangod" is not running, please, run it first.')
 
-    get_status(endpoint, username, password, query_id)
+    print(get_status(endpoint, username, password, query_id))
