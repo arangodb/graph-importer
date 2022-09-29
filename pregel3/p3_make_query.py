@@ -101,8 +101,6 @@ if __name__ == "__main__":
     if not arangodIsRunning():
         raise RuntimeError('The process "arangod" is not running, please, run it first.')
 
-    print(args)
-
     query_id = args.query_id
 
     graph_spec = dict()

@@ -34,7 +34,7 @@ def load_graph(db_info: DatabaseInfo, query_id: str) -> bool:
 
     response = requests.get(url, auth=(db_info.username, db_info.password))
     if response.status_code != 200:
-        print('No query with this query id was found.')
+        print(json.loads(response.content)['errorMessage'])
         return False
     return True
 
@@ -48,8 +48,6 @@ if __name__ == "__main__":
 
     if not arangodIsRunning():
         raise RuntimeError('The process "arangod" is not running, please, run it first.')
-
-    print(args)
 
     query_id = args.query_id
 

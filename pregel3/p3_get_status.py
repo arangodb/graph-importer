@@ -39,7 +39,7 @@ def get_status(endpoint: str, user: str, passw: str, query_id: str) -> bool:
 
 
 if __name__ == "__main__":
-    print("Start loading graph")
+    print("Getting the query status")
     args = get_arguments()
 
     endpoint = args.endpoint
@@ -50,7 +50,4 @@ if __name__ == "__main__":
     if not arangodIsRunning():
         raise RuntimeError('The process "arangod" is not running, please, run it first.')
 
-    print(args)
-
-    if get_status(endpoint, username, password, query_id):
-        print("Graph loaded")
+    get_status(endpoint, username, password, query_id)
