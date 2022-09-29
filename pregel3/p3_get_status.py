@@ -25,17 +25,17 @@ def get_arguments():
     return arguments
 
 
-def get_status(endpoint: str, user: str, passw: str, query_id: str) -> bool:
+def get_status(endpoint: str, user: str, passw: str, query_id: str) -> None:
     """
     Return the status of the wuery with the given query_id. If no query with query_id exists, an error is returned.
     """
-    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id);
+    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id)
 
     response = requests.get(url, auth=(user, passw))
     if response.status_code != 200:
-        print('No query with this query id was found.')
-        return False
-    return True
+        print(json.loads(response.content)['errorMessage'])
+    else:
+        print(json.loads(response.content)['result']['state'])
 
 
 if __name__ == "__main__":

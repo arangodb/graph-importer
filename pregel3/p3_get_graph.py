@@ -26,11 +26,11 @@ def get_arguments():
     return arguments
 
 
-def get_graph(endpoint: str, user: str, passw: str, query_id: str) -> bool:
+def get_graph(endpoint: str, user: str, passw: str, query_id: str) -> None:
     """
     Get the graph from the query with the given query_id. If no query with query_id exists, an error is returned.
     """
-    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id + "/getGraph");
+    url = os.path.join(endpoint, "_api/pregel3/queries/" + query_id + "/getGraph")
 
     response = requests.get(url, auth=(username, password))
     if response.status_code != 200:
